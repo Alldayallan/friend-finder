@@ -43,7 +43,7 @@
 </div>
 
 <!-- OTP Modal -->
-<div class="modal fade" id="otpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+<div class="modal" id="otpModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -70,13 +70,21 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing login form...');
+
     const loginForm = document.getElementById('loginForm');
-    const otpModal = new bootstrap.Modal(document.getElementById('otpModal'));
+    const otpModalElement = document.getElementById('otpModal');
     const otpForm = document.getElementById('otpForm');
     const verifyOtpBtn = document.getElementById('verifyOtp');
     const loginAlert = document.getElementById('loginAlert');
     const otpAlert = document.getElementById('otpAlert');
     let userEmail = '';
+
+    console.log('Modal element found:', otpModalElement !== null);
+
+    // Initialize Bootstrap modal
+    const otpModal = new bootstrap.Modal(otpModalElement);
+    console.log('Modal initialized');
 
     function showAlert(element, message) {
         element.textContent = message;
@@ -90,11 +98,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     loginForm.addEventListener('submit', async function(e) {
         e.preventDefault();
+        console.log('Login form submitted');
         hideAlert(loginAlert);
 
         try {
             const formData = new FormData(this);
             userEmail = formData.get('email');
+            console.log('Submitting login for email:', userEmail);
 
             const response = await fetch(window.location.pathname, {
                 method: 'POST',
@@ -102,21 +112,24 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const data = await response.json();
-            console.log('Login response:', data);  // Debug log
+            console.log('Login response:', data);
 
             if (data.success) {
+                console.log('Login successful, showing OTP modal');
                 otpModal.show();
                 hideAlert(otpAlert);
             } else {
+                console.log('Login failed:', data.message);
                 showAlert(loginAlert, data.message || 'Login failed. Please try again.');
             }
         } catch (error) {
-            console.error('Login error:', error);  // Debug log
+            console.error('Login error:', error);
             showAlert(loginAlert, 'An error occurred. Please try again.');
         }
     });
 
     verifyOtpBtn.addEventListener('click', async function() {
+        console.log('Verifying OTP');
         hideAlert(otpAlert);
         const otp = document.getElementById('otp').value;
 
@@ -129,6 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData();
             formData.append('otp', otp);
             formData.append('email', userEmail);
+            console.log('Submitting OTP verification for email:', userEmail);
 
             const response = await fetch('{{ url_for("verify_otp") }}', {
                 method: 'POST',
@@ -136,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const data = await response.json();
-            console.log('OTP verification response:', data);  // Debug log
+            console.log('OTP verification response:', data);
 
             if (data.success) {
                 window.location.href = data.redirect;
@@ -144,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showAlert(otpAlert, data.message || 'Invalid OTP. Please try again.');
             }
         } catch (error) {
-            console.error('OTP verification error:', error);  // Debug log
+            console.error('OTP verification error:', error);
             showAlert(otpAlert, 'An error occurred. Please try again.');
         }
     });
@@ -162,6 +176,8 @@ document.addEventListener('DOMContentLoaded', function() {
             verifyOtpBtn.click();
         }
     });
+
+    console.log('Login form initialization complete');
 });
 </script>
 {% endblock %}
