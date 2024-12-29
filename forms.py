@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, URLField
-from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError, URL, Optional
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, URLField, SelectField, IntegerField
+from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError, URL, Optional, NumberRange
 from models import User
 
 class LoginForm(FlaskForm):
@@ -63,10 +63,32 @@ class ResetPasswordForm(FlaskForm):
 
 class ProfileForm(FlaskForm):
     profile_picture = URLField('Profile Picture URL', validators=[Optional(), URL()])
-    bio = TextAreaField('Bio/Description', validators=[Optional(), Length(max=500)])
-    interests = TextAreaField('Interests and Hobbies', validators=[Optional(), Length(max=200)])
+    bio = TextAreaField('About Me', validators=[Optional(), Length(max=1000)])
+    interests = TextAreaField('Interests and Hobbies', validators=[Optional(), Length(max=500)])
     location = StringField('Location', validators=[Optional(), Length(max=120)])
+
+    # Friend finder specific fields
+    age = IntegerField('Age', validators=[Optional(), NumberRange(min=18, max=120)])
+    looking_for = SelectField('Looking For', choices=[
+        ('friendship', 'Friendship'),
+        ('activity_partner', 'Activity Partner'),
+        ('study_buddy', 'Study Buddy'),
+        ('networking', 'Professional Networking')
+    ], validators=[Optional()])
+    activities = TextAreaField('Favorite Activities', validators=[Optional(), Length(max=500)])
+    availability = SelectField('Usually Available', choices=[
+        ('weekdays', 'Weekdays'),
+        ('weekends', 'Weekends'),
+        ('evenings', 'Evenings'),
+        ('flexible', 'Flexible')
+    ], validators=[Optional()])
+
+    # Privacy settings
     location_visible = BooleanField('Show Location Publicly')
     interests_visible = BooleanField('Show Interests Publicly')
     bio_visible = BooleanField('Show Bio Publicly')
+    age_visible = BooleanField('Show Age Publicly')
+    activities_visible = BooleanField('Show Activities Publicly')
+    availability_visible = BooleanField('Show Availability Publicly')
+
     submit = SubmitField('Update Profile')
