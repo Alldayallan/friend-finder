@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask, render_template, flash, redirect, url_for, request, session
+from flask import Flask, render_template, flash, redirect, url_for, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_mail import Mail, Message
@@ -15,6 +15,7 @@ class Base(DeclarativeBase):
     pass
 
 db = SQLAlchemy(model_class=Base)
+mail = Mail()  # Initialize mail first
 app = Flask(__name__)
 
 # Configuration
@@ -25,12 +26,37 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
 }
 
+# Mail configuration
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
+
 # Initialize extensions
 db.init_app(app)
+mail.init_app(app)  # Initialize mail with app
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
+
+def send_reset_email(user):
+    try:
+        token = user.get_reset_token()
+        msg = Message('Password Reset Request',
+                    recipients=[user.email])
+        msg.body = f'''To reset your password, visit the following link:
+{url_for('reset_password', token=token, _external=True)}
+
+If you did not make this request then simply ignore this email and no changes will be made.
+'''
+        mail.send(msg)
+        app.logger.info(f"Password reset email sent to {user.email}")
+    except Exception as e:
+        app.logger.error(f"Failed to send password reset email: {str(e)}")
+        raise
 
 # Import after app initialization to avoid circular imports
 from models import User
@@ -153,27 +179,6 @@ def profile():
         form.bio_visible.data = current_user.privacy_settings.get('bio_visible', True)
     return render_template('profile.html', form=form)
 
-
-# Mail configuration (This part was in the original code and was not explicitly mentioned to be removed, so I am keeping it)
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
-
-def send_reset_email(user):
-    token = user.get_reset_token()
-    msg = Message('Password Reset Request',
-                  recipients=[user.email])
-    msg.body = f'''To reset your password, visit the following link:
-{url_for('reset_password', token=token, _external=True)}
-
-If you did not make this request then simply ignore this email and no changes will be made.
-'''
-    mail.send(msg)
-
-mail = Mail(app)
 
 # Create tables
 with app.app_context():

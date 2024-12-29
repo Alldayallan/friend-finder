@@ -1,8 +1,8 @@
-from app import db
 from flask_login import UserMixin
 from time import time
 import jwt
-from app import app
+from app import db, app
+from datetime import datetime
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -11,7 +11,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     reset_token = db.Column(db.String(120), unique=True)
     reset_token_expiry = db.Column(db.DateTime)
-    # New profile fields
+    # Profile fields
     profile_picture = db.Column(db.String(200))  # URL to profile picture
     bio = db.Column(db.Text)
     interests = db.Column(db.Text)
@@ -27,20 +27,29 @@ class User(UserMixin, db.Model):
 
     def get_reset_token(self, expires_in=600):
         """Generate a password reset token that expires in 10 minutes"""
-        return jwt.encode(
-            {'reset_password': self.id, 'exp': time() + expires_in},
-            app.config['SECRET_KEY'],
-            algorithm='HS256'
-        )
+        try:
+            token = jwt.encode(
+                {'reset_password': self.id, 'exp': time() + expires_in},
+                app.config['SECRET_KEY'],
+                algorithm='HS256'
+            )
+            self.reset_token = token
+            self.reset_token_expiry = datetime.fromtimestamp(time() + expires_in)
+            db.session.commit()
+            return token
+        except Exception as e:
+            app.logger.error(f"Error generating reset token: {str(e)}")
+            raise
 
     @staticmethod
     def verify_reset_token(token):
         """Verify the reset token"""
         try:
             id = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])['reset_password']
-        except:
+            return User.query.get(id)
+        except Exception as e:
+            app.logger.error(f"Error verifying reset token: {str(e)}")
             return None
-        return User.query.get(id)
 
     def update_profile(self, data):
         """Update user profile with the provided data"""
