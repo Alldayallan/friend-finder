@@ -9,7 +9,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    reset_token = db.Column(db.String(120), unique=True)
+    reset_token = db.Column(db.String(500), unique=True)  # Increased from 120 to 500
     reset_token_expiry = db.Column(db.DateTime)
     # Profile fields
     profile_picture = db.Column(db.String(200))  # URL to profile picture
