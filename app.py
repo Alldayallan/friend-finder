@@ -45,8 +45,11 @@ login_manager.login_message_category = 'info'
 def send_reset_email(user):
     try:
         token = user.get_reset_token()
-        msg = Message('Password Reset Request',
-                    recipients=[user.email])
+        msg = Message(
+            'Password Reset Request',
+            sender=app.config['MAIL_DEFAULT_SENDER'],
+            recipients=[user.email]
+        )
         msg.body = f'''To reset your password, visit the following link:
 {url_for('reset_password', token=token, _external=True)}
 
@@ -123,9 +126,17 @@ def reset_password_request():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user:
-            send_reset_email(user)
-        flash('Check your email for the instructions to reset your password', 'info')
-        return redirect(url_for('login'))
+            try:
+                send_reset_email(user)
+                flash('Check your email for the instructions to reset your password', 'info')
+                return redirect(url_for('login'))
+            except Exception as e:
+                app.logger.error(f"Password reset error: {str(e)}")
+                flash('An error occurred sending the password reset email. Please try again.', 'danger')
+        else:
+            # Don't reveal if email exists or not for security
+            flash('Check your email for the instructions to reset your password', 'info')
+            return redirect(url_for('login'))
     return render_template('reset_password_request.html', form=form)
 
 @app.route('/reset_password/<token>', methods=['GET', 'POST'])
