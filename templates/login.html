@@ -43,11 +43,11 @@
 </div>
 
 <!-- OTP Modal -->
-<div class="modal fade" id="otpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="otpModalLabel" aria-hidden="true">
+<div class="modal fade" id="otpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="otpModalLabel">Enter OTP</h5>
+                <h5 class="modal-title">Enter OTP</h5>
             </div>
             <div class="modal-body">
                 <div id="otpAlert" class="alert alert-danger d-none"></div>
@@ -71,10 +71,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('loginForm');
-    const otpModal = new bootstrap.Modal(document.getElementById('otpModal'), {
-        backdrop: 'static',
-        keyboard: false
-    });
+    const otpModal = new bootstrap.Modal(document.getElementById('otpModal'));
     const otpForm = document.getElementById('otpForm');
     const verifyOtpBtn = document.getElementById('verifyOtp');
     const loginAlert = document.getElementById('loginAlert');
@@ -95,16 +92,17 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         hideAlert(loginAlert);
 
-        const formData = new FormData(loginForm);
-        userEmail = formData.get('email');
-
         try {
+            const formData = new FormData(this);
+            userEmail = formData.get('email');
+
             const response = await fetch(window.location.pathname, {
                 method: 'POST',
                 body: formData
             });
 
             const data = await response.json();
+            console.log('Login response:', data);  // Debug log
 
             if (data.success) {
                 otpModal.show();
@@ -113,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showAlert(loginAlert, data.message || 'Login failed. Please try again.');
             }
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Login error:', error);  // Debug log
             showAlert(loginAlert, 'An error occurred. Please try again.');
         }
     });
@@ -127,16 +125,18 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const formData = new FormData();
-        formData.append('otp', otp);
-        formData.append('email', userEmail);
-
         try {
+            const formData = new FormData();
+            formData.append('otp', otp);
+            formData.append('email', userEmail);
+
             const response = await fetch('{{ url_for("verify_otp") }}', {
                 method: 'POST',
                 body: formData
             });
+
             const data = await response.json();
+            console.log('OTP verification response:', data);  // Debug log
 
             if (data.success) {
                 window.location.href = data.redirect;
@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showAlert(otpAlert, data.message || 'Invalid OTP. Please try again.');
             }
         } catch (error) {
-            console.error('Error:', error);
+            console.error('OTP verification error:', error);  // Debug log
             showAlert(otpAlert, 'An error occurred. Please try again.');
         }
     });

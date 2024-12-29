@@ -103,20 +103,26 @@ def login():
         user = User.query.filter_by(email=form.email.data).first()
         if user and check_password_hash(user.password_hash, form.password.data):
             # Generate and send OTP
-            otp = user.generate_otp()
             try:
+                otp = user.generate_otp()
                 msg = Message('Your Login OTP',
                             sender=app.config['MAIL_DEFAULT_SENDER'],
                             recipients=[user.email])
                 msg.body = f'Your OTP for login is: {otp}\nThis code will expire in 5 minutes.'
                 mail.send(msg)
-                flash('An OTP has been sent to your email.', 'info')
+                app.logger.info(f'OTP sent successfully to {user.email}')
                 return jsonify({'success': True, 'message': 'OTP sent successfully'})
             except Exception as e:
                 app.logger.error(f"Failed to send OTP email: {str(e)}")
-                flash('Error sending OTP. Please try again.', 'danger')
-                return jsonify({'success': False, 'message': 'Failed to send OTP'})
-        flash('Invalid email or password', 'danger')
+                return jsonify({'success': False, 'message': 'Error sending OTP. Please try again.'})
+        app.logger.info('Invalid login attempt')
+        return jsonify({'success': False, 'message': 'Invalid email or password'})
+
+    # Handle GET request or invalid form
+    if request.method == 'POST':
+        app.logger.info('Form validation failed')
+        return jsonify({'success': False, 'message': 'Invalid form data'})
+
     return render_template('login.html', form=form)
 
 @app.route('/verify-otp', methods=['POST'])
