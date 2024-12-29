@@ -26,13 +26,25 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
 }
 
-# Mail configuration
+# Mail configuration with better error handling
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
+
+# Additional check for required email configuration
+if not all([
+    app.config['MAIL_USERNAME'],
+    app.config['MAIL_PASSWORD'],
+    app.config['MAIL_DEFAULT_SENDER']
+]):
+    app.logger.warning(
+        "Email configuration incomplete. Password reset functionality may not work properly. "
+        "Please ensure MAIL_USERNAME, MAIL_PASSWORD, and MAIL_DEFAULT_SENDER are set."
+    )
+
 
 # Initialize extensions
 db.init_app(app)
