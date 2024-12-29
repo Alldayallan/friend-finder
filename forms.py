@@ -39,6 +39,13 @@ class RegistrationForm(FlaskForm):
         if user:
             raise ValidationError('Email already registered.')
 
+class OTPForm(FlaskForm):
+    otp_code = StringField('Enter OTP Code', validators=[
+        DataRequired(),
+        Length(min=6, max=6, message='OTP must be 6 digits')
+    ])
+    submit = SubmitField('Verify OTP')
+
 class RequestPasswordResetForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     submit = SubmitField('Request Password Reset')

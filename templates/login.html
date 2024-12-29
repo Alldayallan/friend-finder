@@ -8,7 +8,7 @@
         <div class="card">
             <div class="card-body">
                 <h2 class="card-title text-center mb-4">Login</h2>
-                <form method="POST" novalidate>
+                <form id="loginForm" method="POST" novalidate>
                     {{ form.hidden_tag() }}
                     <div class="mb-3">
                         {{ form.email.label(class="form-label") }}
@@ -40,4 +40,93 @@
         </div>
     </div>
 </div>
+
+<!-- OTP Modal -->
+<div class="modal fade" id="otpModal" tabindex="-1" aria-labelledby="otpModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="otpModalLabel">Enter OTP</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="otpForm">
+                    <div class="mb-3">
+                        <label for="otp" class="form-label">Enter the 6-digit code sent to your email</label>
+                        <input type="text" class="form-control" id="otp" maxlength="6" required pattern="[0-9]{6}">
+                        <div class="invalid-feedback">Please enter a valid 6-digit code.</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="verifyOtp">Verify OTP</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = document.getElementById('loginForm');
+    const otpModal = new bootstrap.Modal(document.getElementById('otpModal'));
+    const otpForm = document.getElementById('otpForm');
+    const verifyOtpBtn = document.getElementById('verifyOtp');
+    let userEmail = '';
+
+    loginForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(loginForm);
+        userEmail = formData.get('email');
+
+        try {
+            const response = await fetch('{{ url_for("login") }}', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                otpModal.show();
+            } else {
+                // Handle login error
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger';
+                alertDiv.textContent = data.message;
+                loginForm.insertBefore(alertDiv, loginForm.firstChild);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    });
+
+    verifyOtpBtn.addEventListener('click', async function() {
+        const otp = document.getElementById('otp').value;
+        const formData = new FormData();
+        formData.append('otp', otp);
+        formData.append('email', userEmail);
+
+        try {
+            const response = await fetch('{{ url_for("verify_otp") }}', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                window.location.href = data.redirect;
+            } else {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger';
+                alertDiv.textContent = data.message;
+                otpForm.insertBefore(alertDiv, otpForm.firstChild);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    });
+});
+</script>
 {% endblock %}

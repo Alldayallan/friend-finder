@@ -3,16 +3,18 @@ from time import time
 import jwt
 from app import db, app
 from datetime import datetime
+import random
+import string
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    reset_token = db.Column(db.String(500), unique=True)  # Increased from 120 to 500
+    reset_token = db.Column(db.String(500), unique=True)
     reset_token_expiry = db.Column(db.DateTime)
     # Profile fields
-    profile_picture = db.Column(db.String(200))  # URL to profile picture
+    profile_picture = db.Column(db.String(200))
     bio = db.Column(db.Text)
     interests = db.Column(db.Text)
     location = db.Column(db.String(120))
@@ -21,6 +23,9 @@ class User(UserMixin, db.Model):
         'interests_visible': True,
         'bio_visible': True
     })
+    # OTP fields
+    otp_code = db.Column(db.String(6))
+    otp_expiry = db.Column(db.DateTime)
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -50,6 +55,22 @@ class User(UserMixin, db.Model):
         except Exception as e:
             app.logger.error(f"Error verifying reset token: {str(e)}")
             return None
+
+    def generate_otp(self, expires_in=300):
+        """Generate a 6-digit OTP that expires in 5 minutes"""
+        otp = ''.join(random.choices(string.digits, k=6))
+        self.otp_code = otp
+        self.otp_expiry = datetime.fromtimestamp(time() + expires_in)
+        db.session.commit()
+        return otp
+
+    def verify_otp(self, otp):
+        """Verify the OTP code"""
+        if not self.otp_code or not self.otp_expiry:
+            return False
+        if datetime.utcnow() > self.otp_expiry:
+            return False
+        return self.otp_code == otp
 
     def update_profile(self, data):
         """Update user profile with the provided data"""

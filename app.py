@@ -1,12 +1,13 @@
 import os
 import logging
-from flask import Flask, render_template, flash, redirect, url_for, request
+from flask import Flask, render_template, flash, redirect, url_for, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_mail import Mail, Message
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+import logging
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
@@ -101,11 +102,40 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user and check_password_hash(user.password_hash, form.password.data):
-            login_user(user, remember=form.remember_me.data)
-            next_page = request.args.get('next')
-            return redirect(next_page if next_page else url_for('home'))
+            # Generate and send OTP
+            otp = user.generate_otp()
+            try:
+                msg = Message('Your Login OTP',
+                            sender=app.config['MAIL_DEFAULT_SENDER'],
+                            recipients=[user.email])
+                msg.body = f'Your OTP for login is: {otp}\nThis code will expire in 5 minutes.'
+                mail.send(msg)
+                flash('An OTP has been sent to your email.', 'info')
+                return jsonify({'success': True, 'message': 'OTP sent successfully'})
+            except Exception as e:
+                app.logger.error(f"Failed to send OTP email: {str(e)}")
+                flash('Error sending OTP. Please try again.', 'danger')
+                return jsonify({'success': False, 'message': 'Failed to send OTP'})
         flash('Invalid email or password', 'danger')
     return render_template('login.html', form=form)
+
+@app.route('/verify-otp', methods=['POST'])
+def verify_otp():
+    otp = request.form.get('otp')
+    email = request.form.get('email')
+
+    if not otp or not email:
+        return jsonify({'success': False, 'message': 'Missing OTP or email'})
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'})
+
+    if user.verify_otp(otp):
+        login_user(user)
+        return jsonify({'success': True, 'redirect': url_for('home')})
+    else:
+        return jsonify({'success': False, 'message': 'Invalid or expired OTP'})
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
