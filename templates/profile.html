@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - {{ current_user.username }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <!-- Profile Display Section -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    {% if current_user.profile_picture %}
+                        <img src="{{ current_user.profile_picture }}" alt="Profile Picture" class="rounded-circle img-fluid mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    {% else %}
+                        <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 150px; height: 150px;">
+                            <i class="bi bi-person-fill" style="font-size: 4rem; color: white;"></i>
+                        </div>
+                    {% endif %}
+                    <h5 class="card-title">{{ current_user.username }}</h5>
+                    {% if current_user.bio and current_user.privacy_settings.get('bio_visible', True) %}
+                        <p class="card-text">{{ current_user.bio }}</p>
+                    {% endif %}
+                    {% if current_user.location and current_user.privacy_settings.get('location_visible', True) %}
+                        <p class="card-text"><i class="bi bi-geo-alt"></i> {{ current_user.location }}</p>
+                    {% endif %}
+                    {% if current_user.interests and current_user.privacy_settings.get('interests_visible', True) %}
+                        <p class="card-text"><strong>Interests:</strong><br>{{ current_user.interests }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Edit Form -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title mb-4">Edit Profile</h4>
+                    <form method="POST" class="needs-validation" novalidate>
+                        {{ form.hidden_tag() }}
+                        <div class="mb-3">
+                            {{ form.profile_picture.label(class="form-label") }}
+                            {{ form.profile_picture(class="form-control") }}
+                            {% for error in form.profile_picture.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.bio.label(class="form-label") }}
+                            {{ form.bio(class="form-control", rows="4") }}
+                            {% for error in form.bio.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.interests.label(class="form-label") }}
+                            {{ form.interests(class="form-control", rows="3") }}
+                            {% for error in form.interests.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.location.label(class="form-label") }}
+                            {{ form.location(class="form-control") }}
+                            {% for error in form.location.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <hr class="my-4">
+                        <h5 class="mb-3">Privacy Settings</h5>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.location_visible(class="form-check-input") }}
+                                {{ form.location_visible.label(class="form-check-label") }}
+                            </div>
+                            <div class="form-check">
+                                {{ form.interests_visible(class="form-check-input") }}
+                                {{ form.interests_visible.label(class="form-check-label") }}
+                            </div>
+                            <div class="form-check">
+                                {{ form.bio_visible(class="form-check-input") }}
+                                {{ form.bio_visible.label(class="form-check-label") }}
+                            </div>
+                        </div>
+                        <div class="d-grid">
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
