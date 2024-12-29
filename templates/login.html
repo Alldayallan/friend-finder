@@ -8,6 +8,7 @@
         <div class="card">
             <div class="card-body">
                 <h2 class="card-title text-center mb-4">Login</h2>
+                <div id="loginAlert" class="alert alert-danger d-none"></div>
                 <form id="loginForm" method="POST" novalidate>
                     {{ form.hidden_tag() }}
                     <div class="mb-3">
@@ -42,14 +43,14 @@
 </div>
 
 <!-- OTP Modal -->
-<div class="modal fade" id="otpModal" tabindex="-1" aria-labelledby="otpModalLabel" aria-hidden="true">
+<div class="modal fade" id="otpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="otpModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="otpModalLabel">Enter OTP</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                <div id="otpAlert" class="alert alert-danger d-none"></div>
                 <form id="otpForm">
                     <div class="mb-3">
                         <label for="otp" class="form-label">Enter the 6-digit code sent to your email</label>
@@ -59,7 +60,6 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-primary" id="verifyOtp">Verify OTP</button>
             </div>
         </div>
@@ -71,39 +71,62 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('loginForm');
-    const otpModal = new bootstrap.Modal(document.getElementById('otpModal'));
+    const otpModal = new bootstrap.Modal(document.getElementById('otpModal'), {
+        backdrop: 'static',
+        keyboard: false
+    });
     const otpForm = document.getElementById('otpForm');
     const verifyOtpBtn = document.getElementById('verifyOtp');
+    const loginAlert = document.getElementById('loginAlert');
+    const otpAlert = document.getElementById('otpAlert');
     let userEmail = '';
+
+    function showAlert(element, message) {
+        element.textContent = message;
+        element.classList.remove('d-none');
+    }
+
+    function hideAlert(element) {
+        element.classList.add('d-none');
+        element.textContent = '';
+    }
 
     loginForm.addEventListener('submit', async function(e) {
         e.preventDefault();
+        hideAlert(loginAlert);
+
         const formData = new FormData(loginForm);
         userEmail = formData.get('email');
 
         try {
-            const response = await fetch('{{ url_for("login") }}', {
+            const response = await fetch(window.location.pathname, {
                 method: 'POST',
                 body: formData
             });
+
             const data = await response.json();
 
             if (data.success) {
                 otpModal.show();
+                hideAlert(otpAlert);
             } else {
-                // Handle login error
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-danger';
-                alertDiv.textContent = data.message;
-                loginForm.insertBefore(alertDiv, loginForm.firstChild);
+                showAlert(loginAlert, data.message || 'Login failed. Please try again.');
             }
         } catch (error) {
             console.error('Error:', error);
+            showAlert(loginAlert, 'An error occurred. Please try again.');
         }
     });
 
     verifyOtpBtn.addEventListener('click', async function() {
+        hideAlert(otpAlert);
         const otp = document.getElementById('otp').value;
+
+        if (!/^\d{6}$/.test(otp)) {
+            showAlert(otpAlert, 'Please enter a valid 6-digit OTP code.');
+            return;
+        }
+
         const formData = new FormData();
         formData.append('otp', otp);
         formData.append('email', userEmail);
@@ -118,13 +141,25 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 window.location.href = data.redirect;
             } else {
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-danger';
-                alertDiv.textContent = data.message;
-                otpForm.insertBefore(alertDiv, otpForm.firstChild);
+                showAlert(otpAlert, data.message || 'Invalid OTP. Please try again.');
             }
         } catch (error) {
             console.error('Error:', error);
+            showAlert(otpAlert, 'An error occurred. Please try again.');
+        }
+    });
+
+    // Handle OTP input validation
+    const otpInput = document.getElementById('otp');
+    otpInput.addEventListener('input', function() {
+        this.value = this.value.replace(/[^\d]/g, '').slice(0, 6);
+    });
+
+    // Handle Enter key in OTP input
+    otpInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            verifyOtpBtn.click();
         }
     });
 });
