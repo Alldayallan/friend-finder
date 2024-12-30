@@ -5,9 +5,10 @@
 {% block content %}
 <div class="container py-4">
     <h2 class="mb-4">Friend Suggestions</h2>
-    
+
     {% if not suggestions %}
         <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
             No friend suggestions available at the moment. Try updating your profile with more information!
         </div>
     {% else %}
@@ -18,7 +19,7 @@
                         <div class="position-absolute top-0 end-0 p-2">
                             <span class="badge bg-primary">{{ (score * 100)|round }}% Match</span>
                         </div>
-                        
+
                         {% if user.profile_picture %}
                             <img src="{{ user.profile_picture }}" class="card-img-top" alt="Profile picture" style="height: 200px; object-fit: cover;">
                         {% else %}
@@ -26,46 +27,53 @@
                                 <i class="bi bi-person-fill" style="font-size: 4rem; color: white;"></i>
                             </div>
                         {% endif %}
-                        
+
                         <div class="card-body">
                             <h5 class="card-title">{{ user.username }}</h5>
-                            
+
                             {% if user.age and user.privacy_settings.get('age_visible', True) %}
                                 <p class="card-text"><i class="bi bi-calendar"></i> {{ user.age }} years old</p>
                             {% endif %}
-                            
+
                             {% if user.location and user.privacy_settings.get('location_visible', True) %}
                                 <p class="card-text"><i class="bi bi-geo-alt"></i> {{ user.location }}</p>
                             {% endif %}
-                            
+
                             {% if user.looking_for %}
                                 <p class="card-text">
                                     <i class="bi bi-search-heart"></i> Looking for: {{ user.looking_for | replace('_', ' ') | title }}
                                 </p>
                             {% endif %}
-                            
+
                             {% if user.availability and user.privacy_settings.get('availability_visible', True) %}
                                 <p class="card-text">
                                     <i class="bi bi-clock"></i> Available: {{ user.availability | title }}
                                 </p>
                             {% endif %}
-                            
+
                             {% if user.interests and user.privacy_settings.get('interests_visible', True) %}
                                 <div class="card-text mt-3">
                                     <h6><i class="bi bi-heart-fill"></i> Interests</h6>
-                                    <p class="small">{{ user.interests }}</p>
+                                    {{ user.interests | safe }}
+                                </div>
+                            {% endif %}
+
+                            {% if user.activities and user.privacy_settings.get('activities_visible', True) %}
+                                <div class="card-text mt-3">
+                                    <h6><i class="bi bi-activity"></i> Activities</h6>
+                                    {{ user.activities | safe }}
                                 </div>
                             {% endif %}
                         </div>
-                        
+
                         <div class="card-footer bg-transparent border-top-0">
                             <div class="d-grid gap-2">
-                                <button class="btn btn-outline-success btn-sm">
+                                <a href="{{ url_for('match_response', match_id=user.id, response='accept') }}" class="btn btn-outline-success btn-sm">
                                     <i class="bi bi-check-lg"></i> Connect
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm">
+                                </a>
+                                <a href="{{ url_for('match_response', match_id=user.id, response='reject') }}" class="btn btn-outline-secondary btn-sm">
                                     <i class="bi bi-x-lg"></i> Skip
-                                </button>
+                                </a>
                             </div>
                         </div>
                     </div>
