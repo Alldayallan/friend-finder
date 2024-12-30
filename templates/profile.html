@@ -187,29 +187,33 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.2/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize TinyMCE WYSIWYG editor
-    tinymce.init({
-        selector: '.wysiwyg-editor',
-        height: 200,
-        menubar: false,
-        plugins: [
-            'lists', 'link', 'autolink', 'autoresize'
-        ],
-        toolbar: 'undo redo | formatselect | ' +
-                'bold italic | alignleft aligncenter ' +
-                'alignright alignjustify | bullist numlist | ' +
-                'removeformat | help',
-        content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial; font-size: 14px }',
-        formats: {
-            p: { block: 'p' },
-            h1: { block: 'h1' },
-            h2: { block: 'h2' },
-            h3: { block: 'h3' }
-        }
-    });
+    try {
+        tinymce.init({
+            selector: '.wysiwyg-editor',
+            height: 200,
+            menubar: false,
+            branding: false,
+            promotion: false,
+            plugins: 'lists autolink',
+            toolbar: 'undo redo | bold italic | bullist numlist | removeformat',
+            content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial; font-size: 14px }',
+            setup: function(editor) {
+                editor.on('init', function() {
+                    console.log('Editor initialized successfully');
+                });
+            }
+        }).then(function() {
+            console.log('All editors initialized');
+        }).catch(function(err) {
+            console.error('Editor initialization failed:', err);
+        });
+    } catch (e) {
+        console.error('Failed to initialize TinyMCE:', e);
+    }
 
     // Drag & Drop functionality
     const fileDropArea = document.querySelector('.file-drop-area');
