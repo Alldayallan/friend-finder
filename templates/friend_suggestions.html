@@ -68,10 +68,12 @@
 
                         <div class="card-footer bg-transparent border-top-0">
                             <div class="d-grid gap-2">
-                                <a href="{{ url_for('match_response', match_id=user.id, response='accept') }}" class="btn btn-outline-success btn-sm">
-                                    <i class="bi bi-check-lg"></i> Connect
-                                </a>
-                                <a href="{{ url_for('match_response', match_id=user.id, response='reject') }}" class="btn btn-outline-secondary btn-sm">
+                                <form action="{{ url_for('send_friend_request', user_id=user.id) }}" method="POST">
+                                    <button type="submit" class="btn btn-outline-success btn-sm w-100">
+                                        <i class="bi bi-person-plus"></i> Connect
+                                    </button>
+                                </form>
+                                <a href="{{ url_for('friend_suggestions') }}" class="btn btn-outline-secondary btn-sm">
                                     <i class="bi bi-x-lg"></i> Skip
                                 </a>
                             </div>
