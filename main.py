@@ -12,7 +12,7 @@ def find_available_port(start_port=5000, max_attempts=10):
         try:
             # Test if port is available
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('127.0.0.1', port))
+                s.bind(('0.0.0.0', port))
                 logger.info(f"Found available port: {port}")
                 return port
         except OSError as e:
