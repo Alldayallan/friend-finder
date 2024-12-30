@@ -9,12 +9,9 @@ import os
 from werkzeug.utils import secure_filename
 from PIL import Image
 import io
-from flask_sqlalchemy import SQLAlchemy
-
-db = SQLAlchemy()
+from database import db
 
 class User(UserMixin, db.Model):
-    # Rest of the User model code remains the same
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
