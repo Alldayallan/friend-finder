@@ -133,18 +133,27 @@ def login():
 
     form = LoginForm()
     if form.validate_on_submit():
+        logger.debug(f"Attempting login for email: {form.email.data}")
         user = User.query.filter_by(email=form.email.data).first()
-        if user and check_password_hash(user.password_hash, form.password.data):
-            # Generate and store OTP
-            otp = ''.join(random.choices(string.digits, k=6))
-            user.otp_code = otp
-            user.otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=10)
-            db.session.commit()
+        if user:
+            logger.debug("User found, checking password")
+            password_matches = check_password_hash(user.password_hash, form.password.data)
+            logger.debug(f"Password check result: {password_matches}")
+            if password_matches:
+                # Generate and store OTP
+                otp = ''.join(random.choices(string.digits, k=6))
+                user.otp_code = otp
+                user.otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=10)
+                db.session.commit()
 
-            # TODO: Send OTP via email
-            logger.info(f"Generated OTP for user {user.email}")
+                # For development, log the OTP
+                logger.info(f"Generated OTP for user {user.email}: {otp}")
 
-            return jsonify({"success": True, "message": "OTP sent successfully"})
+                return jsonify({"success": True, "message": "OTP sent successfully"})
+            else:
+                logger.debug("Password verification failed")
+        else:
+            logger.debug("User not found")
         return jsonify({"success": False, "message": "Invalid email or password"})
 
     return render_template('login.html', form=form)
