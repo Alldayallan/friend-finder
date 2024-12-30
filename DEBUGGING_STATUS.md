@@ -1,24 +1,32 @@
 # Authentication System Debugging Status
-Last Updated: December 29, 2024
+Last Updated: December 30, 2024
 
 ## Current State
-The application is a Flask-based social networking platform with two-factor authentication using email OTP. The basic authentication flow is implemented, but we're currently debugging an issue with the OTP modal display.
+The application is a Flask-based social networking platform with two-factor authentication using email OTP. The basic authentication flow is implemented, but we're currently debugging an issue with the OTP modal display and server port configuration.
 
-## Active Issue
+## Active Issues
+
+### 1. OTP Modal Display
 The OTP modal is not appearing after successful login credentials verification, despite receiving a successful response from the server.
 
-### Server-side Status
+#### Server-side Status
 - Login endpoint (`/login`) is working correctly
 - OTP generation and email sending are functioning
 - Server returns correct JSON response: `{"message": "OTP sent successfully", "success": true}`
 - OTP verification endpoint (`/verify-otp`) is implemented and ready
 
-### Client-side Issue
+#### Client-side Issue
 The Bootstrap modal for OTP entry is not displaying after successful login, despite:
 - Receiving correct server response
 - No visible JavaScript errors
 - Modal HTML being present in the DOM
 - Bootstrap JS being properly loaded
+
+### 2. Server Configuration
+- Currently implementing dynamic port allocation (5000-5010 range)
+- Server automatically finds the next available port if default port is in use
+- Logging has been added to track port allocation
+- Environment is configured for development with debug mode enabled
 
 ## Steps Taken
 1. Verified server-side OTP generation and email sending works
@@ -27,6 +35,7 @@ The Bootstrap modal for OTP entry is not displaying after successful login, desp
 4. Moved Bootstrap modal initialization after DOM load
 5. Added verification checks for modal element existence
 6. Added debug logging throughout the authentication flow
+7. Implemented dynamic port allocation to handle port conflicts
 
 ## Current Implementation
 
@@ -42,6 +51,7 @@ The Bootstrap modal for OTP entry is not displaying after successful login, desp
 - `templates/login.html`: Contains modal implementation and JS
 - `app.py`: Handles login and OTP verification
 - `models.py`: User model with OTP methods
+- `main.py`: Server configuration and port management
 
 ## Next Debug Steps to Try
 1. Verify Bootstrap JS loading order:
@@ -63,28 +73,22 @@ The Bootstrap modal for OTP entry is not displaying after successful login, desp
    - Check for potential CSS conflicts
    - Ensure no other elements interfere with modal display
 
-## How to Continue
-1. Start by implementing one of the suggested debug steps
-2. Add console.log statements before and after modal.show()
-3. Check browser developer tools for:
-   - JavaScript errors
-   - Network requests
-   - DOM structure
-4. Verify Bootstrap is properly initialized by testing other Bootstrap components
-
 ## Current Environment
-- Flask development server running on port 5000
+- Flask development server running with dynamic port allocation (5000-5010 range)
 - PostgreSQL database configured and working
 - Email sending functionality working (using Flask-Mail)
 - Bootstrap 5.3.0 loaded from CDN
+- Debug logging enabled for server and client-side operations
 
 ## Related Issue History
-Previous error: DataError with reset token length (fixed)
-Current error: UI/JavaScript issue with modal display
+- Previous error: DataError with reset token length (fixed)
+- Current error: UI/JavaScript issue with modal display
+- New consideration: Server port allocation handling
 
 ## Notes for Next Developer
 - The server-side implementation is working correctly
 - Focus debugging efforts on client-side modal implementation
 - Console logs have been added throughout the authentication flow
 - Bootstrap modal initialization might need restructuring
-- Consider testing with different Bootstrap versions if needed
+- Dynamic port allocation has been implemented to handle port conflicts
+- Review logs in browser console and server output for detailed debugging information
