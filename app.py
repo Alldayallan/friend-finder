@@ -113,7 +113,12 @@ def verify_otp():
     if not user.otp_code or not user.otp_expiry:
         return jsonify({"success": False, "message": "No OTP request found"})
 
-    if datetime.now(timezone.utc) > user.otp_expiry:
+    # Convert otp_expiry to UTC if it's naive
+    user_otp_expiry = user.otp_expiry
+    if user_otp_expiry.tzinfo is None:
+        user_otp_expiry = user_otp_expiry.replace(tzinfo=timezone.utc)
+
+    if datetime.now(timezone.utc) > user_otp_expiry:
         return jsonify({"success": False, "message": "OTP has expired"})
 
     if user.otp_code != otp:
