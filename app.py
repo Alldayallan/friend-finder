@@ -12,7 +12,7 @@ import random
 import string
 import io
 from database import db
-from models import User
+from models import User, UserMatch # Assuming UserMatch model exists
 from forms import LoginForm, RegistrationForm, RequestPasswordResetForm, ResetPasswordForm, ProfileForm
 
 # Configure logging
@@ -287,6 +287,42 @@ def profile():
             form.availability_visible.data = current_user.privacy_settings.get('availability_visible', True)
 
     return render_template('profile.html', form=form)
+
+
+@app.route('/friend-suggestions')
+@login_required
+def friend_suggestions():
+    logger.info(f"Getting friend suggestions for user {current_user.id}")
+
+    # Get friend suggestions
+    suggestions = current_user.get_friend_suggestions(limit=10)
+
+    # Update last active timestamp
+    current_user.last_active = datetime.now(timezone.utc)
+    db.session.commit()
+
+    return render_template('friend_suggestions.html', suggestions=suggestions)
+
+@app.route('/match-response/<int:match_id>/<string:response>')
+@login_required
+def match_response(match_id, response):
+    match = UserMatch.query.get_or_404(match_id)
+
+    # Verify the current user is the receiver of this match
+    if match.matched_user_id != current_user.id:
+        flash('Unauthorized action', 'danger')
+        return redirect(url_for('friend_suggestions'))
+
+    if response not in ['accept', 'reject']:
+        flash('Invalid response', 'danger')
+        return redirect(url_for('friend_suggestions'))
+
+    match.status = 'accepted' if response == 'accept' else 'rejected'
+    match.updated_at = datetime.now(timezone.utc)
+    db.session.commit()
+
+    flash(f'Successfully {response}ed the friend suggestion', 'success')
+    return redirect(url_for('friend_suggestions'))
 
 
 if __name__ == "__main__":
