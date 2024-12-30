@@ -13,6 +13,21 @@ import math
 from sqlalchemy.sql import func
 from sqlalchemy.ext.hybrid import hybrid_property
 
+class FriendRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    status = db.Column(db.String(20), default='pending')  # pending, accepted, declined
+    created_at = db.Column(db.DateTime, default=func.now())
+    updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())
+
+    # Add relationship to User model
+    sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_requests')
+    receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_requests')
+
+    def __repr__(self):
+        return f'<FriendRequest {self.sender_id} -> {self.receiver_id} ({self.status})>'
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
@@ -43,7 +58,7 @@ class User(UserMixin, db.Model):
     otp_code = db.Column(db.String(6))
     otp_expiry = db.Column(db.DateTime)
     last_active = db.Column(db.DateTime, default=func.now())
-
+    
     # Relationships for friend suggestions
     sent_matches = db.relationship(
         'UserMatch',
@@ -57,6 +72,15 @@ class User(UserMixin, db.Model):
         backref='receiver',
         lazy='dynamic'
     )
+
+    friends = db.relationship(
+        'User', 
+        secondary='friend_connection',
+        primaryjoin='User.id==friend_connection.c.user_id',
+        secondaryjoin='User.id==friend_connection.c.friend_id',
+        backref='befriended_by'
+    )
+
 
     def get_match_score(self, other_user):
         """Calculate match score with another user based on various factors"""
@@ -137,3 +161,9 @@ class UserMatch(db.Model):
 
     def __repr__(self):
         return f'<UserMatch {self.user_id} -> {self.matched_user_id} ({self.match_score})>'
+
+# Friend connection table for many-to-many relationship
+friend_connection = db.Table('friend_connection',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('friend_id', db.Integer, db.ForeignKey('user.id'), primary_key=True)
+)

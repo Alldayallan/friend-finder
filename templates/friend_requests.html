@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Friend Requests{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Friend Requests</h2>
+    
+    {% if not requests %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            No pending friend requests.
+        </div>
+    {% else %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for request in requests %}
+                <div class="col">
+                    <div class="card h-100">
+                        {% if request.sender.profile_picture %}
+                            <img src="{{ request.sender.profile_picture }}" class="card-img-top" alt="Profile picture" style="height: 200px; object-fit: cover;">
+                        {% else %}
+                            <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" style="height: 200px;">
+                                <i class="bi bi-person-fill" style="font-size: 4rem; color: white;"></i>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="card-body">
+                            <h5 class="card-title">{{ request.sender.username }}</h5>
+                            
+                            {% if request.sender.age and request.sender.privacy_settings.get('age_visible', True) %}
+                                <p class="card-text"><i class="bi bi-calendar"></i> {{ request.sender.age }} years old</p>
+                            {% endif %}
+                            
+                            {% if request.sender.location and request.sender.privacy_settings.get('location_visible', True) %}
+                                <p class="card-text"><i class="bi bi-geo-alt"></i> {{ request.sender.location }}</p>
+                            {% endif %}
+                            
+                            <p class="card-text text-muted">
+                                <i class="bi bi-clock"></i> Sent {{ request.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            </p>
+                        </div>
+                        
+                        <div class="card-footer bg-transparent border-top-0">
+                            <div class="d-grid gap-2">
+                                <a href="{{ url_for('handle_friend_request', request_id=request.id, action='accept') }}" 
+                                   class="btn btn-success btn-sm">
+                                    <i class="bi bi-check-lg"></i> Accept
+                                </a>
+                                <a href="{{ url_for('handle_friend_request', request_id=request.id, action='decline') }}"
+                                   class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-x-lg"></i> Decline
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

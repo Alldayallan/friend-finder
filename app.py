@@ -12,7 +12,7 @@ import random
 import string
 import io
 from database import db
-from models import User, UserMatch # Assuming UserMatch model exists
+from models import User, UserMatch, FriendRequest # Added FriendRequest model
 from forms import LoginForm, RegistrationForm, RequestPasswordResetForm, ResetPasswordForm, ProfileForm
 import json
 
@@ -337,6 +337,71 @@ def match_response(match_id, response):
 
     flash(f'Successfully {response}ed the friend suggestion', 'success')
     return redirect(url_for('friend_suggestions'))
+
+#NEW ROUTES ADDED HERE
+@app.route('/send-friend-request/<int:user_id>', methods=['POST'])
+@login_required
+def send_friend_request(user_id):
+    if user_id == current_user.id:
+        flash('You cannot send a friend request to yourself.', 'error')
+        return redirect(url_for('friend_suggestions'))
+
+    # Check if request already exists
+    existing_request = FriendRequest.query.filter_by(
+        sender_id=current_user.id,
+        receiver_id=user_id
+    ).first()
+
+    if existing_request:
+        flash('Friend request already sent.', 'info')
+        return redirect(url_for('friend_suggestions'))
+
+    # Create new friend request
+    friend_request = FriendRequest(sender_id=current_user.id, receiver_id=user_id)
+    db.session.add(friend_request)
+    db.session.commit()
+
+    flash('Friend request sent successfully!', 'success')
+    return redirect(url_for('friend_suggestions'))
+
+@app.route('/friend-requests')
+@login_required
+def friend_requests():
+    received_requests = FriendRequest.query.filter_by(
+        receiver_id=current_user.id,
+        status='pending'
+    ).all()
+    return render_template('friend_requests.html', requests=received_requests)
+
+@app.route('/handle-friend-request/<int:request_id>/<string:action>')
+@login_required
+def handle_friend_request(request_id, action):
+    friend_request = FriendRequest.query.get_or_404(request_id)
+
+    if friend_request.receiver_id != current_user.id:
+        flash('Unauthorized action', 'danger')
+        return redirect(url_for('friend_requests'))
+
+    if action == 'accept':
+        # Add to friends list
+        current_user.friends.append(friend_request.sender)
+        friend_request.status = 'accepted'
+        flash('Friend request accepted!', 'success')
+    elif action == 'decline':
+        friend_request.status = 'declined'
+        flash('Friend request declined.', 'info')
+    else:
+        flash('Invalid action', 'danger')
+        return redirect(url_for('friend_requests'))
+
+    db.session.commit()
+    return redirect(url_for('friend_requests'))
+
+@app.route('/my-friends')
+@login_required
+def my_friends():
+    return render_template('friends.html', friends=current_user.friends)
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
