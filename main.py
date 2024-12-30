@@ -1,4 +1,4 @@
-from app import app
+from app import app, db
 import socket
 import logging
 
@@ -24,6 +24,11 @@ def find_available_port(start_port=5000, max_attempts=10):
     raise RuntimeError(error_msg)
 
 if __name__ == "__main__":
+    with app.app_context():
+        # Create database tables
+        db.create_all()
+        logger.info("Database tables created successfully")
+
     try:
         port = find_available_port()
         logger.info(f"Starting server on port {port}")
