@@ -4,7 +4,7 @@ from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from oauthlib.oauth2 import WebApplicationClient
 from database import db
 from models import User
@@ -13,20 +13,36 @@ import os
 from werkzeug.utils import secure_filename
 from PIL import Image
 import io
+import random
+import string
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-key-12345')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///app.db')
 
 db.init_app(app)
 
 with app.app_context():
     db.create_all()
+    logger.info("Database tables created successfully")
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+@login_manager.user_loader
+def load_user(user_id):
+    logger.debug(f"Loading user with ID: {user_id}")
+    return User.query.get(int(user_id))
+
+@app.route('/')
+def index():
+    logger.info("Accessing index route")
+    return redirect(url_for('login'))
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
@@ -108,6 +124,132 @@ def profile():
             form.availability_visible.data = current_user.privacy_settings.get('availability_visible', True)
 
     return render_template('profile.html', form=form)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    logger.info("Accessing login route")
+    if current_user.is_authenticated:
+        return redirect(url_for('profile'))
+
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user and check_password_hash(user.password_hash, form.password.data):
+            # Generate and store OTP
+            otp = ''.join(random.choices(string.digits, k=6))
+            user.otp_code = otp
+            user.otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=10)
+            db.session.commit()
+
+            # TODO: Send OTP via email
+            logger.info(f"Generated OTP for user {user.email}")
+
+            return jsonify({"success": True, "message": "OTP sent successfully"})
+        return jsonify({"success": False, "message": "Invalid email or password"})
+
+    return render_template('login.html', form=form)
+
+@app.route('/verify-otp', methods=['POST'])
+def verify_otp():
+    logger.info("Verifying OTP")
+    email = request.form.get('email')
+    otp = request.form.get('otp')
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"success": False, "message": "User not found"})
+
+    if not user.otp_code or not user.otp_expiry:
+        return jsonify({"success": False, "message": "No OTP request found"})
+
+    if datetime.now(timezone.utc) > user.otp_expiry:
+        return jsonify({"success": False, "message": "OTP has expired"})
+
+    if user.otp_code != otp:
+        return jsonify({"success": False, "message": "Invalid OTP"})
+
+    login_user(user)
+    user.otp_code = None
+    user.otp_expiry = None
+    db.session.commit()
+
+    return jsonify({"success": True, "redirect": url_for('profile')})
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('login'))
+
+@app.route('/home')
+@login_required
+def home():
+    return render_template('home.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    logger.info("Accessing register route")
+    if current_user.is_authenticated:
+        return redirect(url_for('profile'))
+
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        user = User(
+            username=form.username.data,
+            email=form.email.data
+        )
+        user.password_hash = generate_password_hash(form.password.data)
+
+        try:
+            db.session.add(user)
+            db.session.commit()
+            flash('Registration successful! Please log in.', 'success')
+            return redirect(url_for('login'))
+        except Exception as e:
+            logger.error(f"Registration error: {str(e)}")
+            db.session.rollback()
+            flash('An error occurred during registration.', 'danger')
+
+    return render_template('register.html', form=form)
+
+@app.route('/reset_password_request', methods=['GET', 'POST'])
+def reset_password_request():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    form = RequestPasswordResetForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user:
+            # Generate reset token
+            token = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
+            user.reset_token = token
+            user.reset_token_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
+            db.session.commit()
+            # TODO: Send password reset email
+            flash('Check your email for instructions to reset your password', 'info')
+            return redirect(url_for('login'))
+        flash('If an account exists with that email, password reset instructions will be sent.', 'info')
+        return redirect(url_for('login'))
+    return render_template('reset_password_request.html', form=form)
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    user = User.query.filter_by(reset_token=token).first()
+    if not user or not user.reset_token_expiry or datetime.now(timezone.utc) > user.reset_token_expiry:
+        flash('Invalid or expired reset token', 'error')
+        return redirect(url_for('login'))
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        user.password_hash = generate_password_hash(form.password.data)
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.session.commit()
+        flash('Your password has been reset.', 'success')
+        return redirect(url_for('login'))
+    return render_template('reset_password.html', form=form)
 
 if __name__ == "__main__":
     app.run(debug=True)
