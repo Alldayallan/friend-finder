@@ -39,6 +39,7 @@ class User(UserMixin, db.Model):
         'availability_visible': True
     })
     uploaded_files = db.Column(db.JSON, default=[])
+    activity_images = db.Column(db.JSON, default=[])  # Store list of activity image URLs
     otp_code = db.Column(db.String(6))
     otp_expiry = db.Column(db.DateTime)
     last_active = db.Column(db.DateTime, default=func.now())

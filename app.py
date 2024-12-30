@@ -14,6 +14,7 @@ import io
 from database import db
 from models import User, UserMatch # Assuming UserMatch model exists
 from forms import LoginForm, RegistrationForm, RequestPasswordResetForm, ResetPasswordForm, ProfileForm
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -44,6 +45,14 @@ mail = Mail(app)
 # Ensure upload directory exists
 upload_dir = os.path.join('static', 'uploads')
 os.makedirs(upload_dir, exist_ok=True)
+
+# Add to the existing app configuration
+UPLOAD_FOLDER = os.path.join('static', 'uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
 def send_otp_email(user_email, otp):
     try:
@@ -329,6 +338,58 @@ def match_response(match_id, response):
     flash(f'Successfully {response}ed the friend suggestion', 'success')
     return redirect(url_for('friend_suggestions'))
 
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/upload-activity-image', methods=['POST'])
+@login_required
+def upload_activity_image():
+    try:
+        if 'activity_image' not in request.files:
+            return jsonify({'success': False, 'message': 'No file provided'})
+
+        file = request.files['activity_image']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'No file selected'})
+
+        if file and allowed_file(file.filename):
+            # Process image
+            image = Image.open(file)
+
+            # Resize image maintaining aspect ratio
+            max_size = (800, 800)
+            image.thumbnail(max_size, Image.Resampling.LANCZOS)
+
+            # Convert to RGB if necessary
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+
+            # Generate unique filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"activity_{current_user.id}_{timestamp}_{secure_filename(file.filename)}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+            # Save processed image
+            image.save(filepath, format='JPEG', quality=85)
+
+            # Update user's activity images
+            image_url = url_for('static', filename=f'uploads/{filename}')
+            if not current_user.activity_images:
+                current_user.activity_images = []
+            current_user.activity_images.append(image_url)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Image uploaded successfully',
+                'image_url': image_url
+            })
+
+    except Exception as e:
+        app.logger.error(f"Image upload error: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error uploading image'})
+
+    return jsonify({'success': False, 'message': 'Invalid file type'})
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -142,6 +142,31 @@
                             {% endfor %}
                         </div>
 
+                        <!-- Activity Images Upload Section -->
+                        <div class="mb-3">
+                            <label class="form-label">Activity Images</label>
+                            <div class="activity-image-upload file-drop-area">
+                                <input type="file" name="activity_image" class="activity-file-input" accept="image/*" hidden>
+                                <div class="file-msg">
+                                    <i class="bi bi-cloud-upload"></i>
+                                    <p>Drag & drop activity images here or click to browse</p>
+                                    <small class="text-muted">Max size: 2MB per image. Images will be optimized.</small>
+                                </div>
+                            </div>
+                            <!-- Activity Images Gallery -->
+                            <div class="activity-images-gallery mt-3 row row-cols-2 row-cols-md-4 g-3">
+                                {% if current_user.activity_images %}
+                                    {% for image_url in current_user.activity_images %}
+                                        <div class="col">
+                                            <div class="card h-100">
+                                                <img src="{{ image_url }}" class="card-img-top" alt="Activity Image" style="height: 150px; object-fit: cover;">
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+
                         <hr class="my-4">
                         <h5 class="mb-3">Privacy Settings</h5>
                         <div class="row mb-3">
@@ -279,6 +304,84 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<script>
+    // Activity image upload handling
+    const activityFileInput = document.querySelector('.activity-file-input');
+    const activityDropArea = document.querySelector('.activity-image-upload');
+    const activityGallery = document.querySelector('.activity-images-gallery');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        activityDropArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        activityDropArea.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        activityDropArea.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+        activityDropArea.classList.add('highlight');
+    }
+
+    function unhighlight(e) {
+        activityDropArea.classList.remove('highlight');
+    }
+
+    activityDropArea.addEventListener('drop', handleActivityImageDrop, false);
+    activityFileInput.addEventListener('change', handleActivityImageSelect, false);
+
+    function handleActivityImageDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleActivityImageUpload(files[0]);
+    }
+
+    function handleActivityImageSelect(e) {
+        const files = this.files;
+        handleActivityImageUpload(files[0]);
+    }
+
+    function handleActivityImageUpload(file) {
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('activity_image', file);
+
+        fetch('/upload-activity-image', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Add new image to gallery
+                const col = document.createElement('div');
+                col.className = 'col';
+                col.innerHTML = `
+                    <div class="card h-100">
+                        <img src="${data.image_url}" class="card-img-top" alt="Activity Image" style="height: 150px; object-fit: cover;">
+                    </div>
+                `;
+                activityGallery.appendChild(col);
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error uploading image:', error);
+            alert('Failed to upload image. Please try again.');
+        });
+    }
+</script>
+
 <style>
 .file-drop-area {
     border: 2px dashed var(--bs-border-color);
@@ -320,6 +423,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .profile-picture-container:hover .profile-picture-overlay {
     opacity: 1;
+}
+
+.activity-image-upload {
+    border: 2px dashed var(--bs-border-color);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+}
+
+.activity-image-upload.highlight {
+    border-color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+}
+
+.activity-images-gallery .card {
+    transition: transform 0.2s;
+}
+
+.activity-images-gallery .card:hover {
+    transform: scale(1.05);
 }
 </style>
 {% endblock %}
