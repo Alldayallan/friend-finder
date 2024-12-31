@@ -191,10 +191,13 @@ class User(UserMixin, db.Model):
         scored_matches.sort(key=lambda x: x[1], reverse=True)
         return scored_matches[:limit]
 
-    # Add new relationships for chat
-    chat_groups = db.relationship('ChatGroup', 
-                                secondary='group_membership',
-                                lazy='dynamic')
+    # Modified relationship definition to fix the circular backref
+    chat_groups = db.relationship(
+        'ChatGroup',
+        secondary='group_membership',
+        backref=db.backref('members', lazy='dynamic'),
+        lazy='dynamic'
+    )
     notifications = db.relationship('Notification', backref='user', lazy='dynamic')
 
     def get_unread_messages_count(self):
@@ -261,12 +264,7 @@ class ChatGroup(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=func.now())
     creator = db.relationship('User', foreign_keys=[created_by], backref='created_groups')
-    members = db.relationship('User', 
-                            secondary='group_membership',
-                            lazy='dynamic',
-                            backref=db.backref('chat_groups', lazy='dynamic'))
 
-    # Store group settings as JSON
     settings = db.Column(JSONB, default={
         'allow_media': True,
         'max_members': 50
