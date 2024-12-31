@@ -53,14 +53,14 @@ def send_otp_email(user_email, otp):
                     f"TLS={app.config['MAIL_USE_TLS']}, USERNAME={app.config['MAIL_USERNAME']}")
 
         msg = Message(
-            "Your Login OTP",  # subject as first positional argument
+            subject="Your Login OTP",
             sender=app.config['MAIL_DEFAULT_SENDER'],
-            recipients=[user_email]
-        )
-        msg.body = f'''Your OTP for login is: {otp}
+            recipients=[user_email],
+            body=f'''Your OTP for login is: {otp}
 
 This code will expire in 10 minutes.
 If you did not request this code, please ignore this email.'''
+        )
 
         mail.send(msg)
         logger.info(f"OTP email sent successfully to {user_email}")
