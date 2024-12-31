@@ -72,6 +72,9 @@
                     <div class="card h-100 animate__animated animate__fadeIn">
                         <div class="position-absolute top-0 end-0 p-2">
                             <span class="badge bg-primary">{{ (score * 100)|round }}% Match</span>
+                            {% if current_user.is_friend_with(user) %}
+                                <span class="badge bg-success ms-1">Connected</span>
+                            {% endif %}
                         </div>
 
                         {% if user.profile_picture %}
@@ -130,14 +133,20 @@
 
                         <div class="card-footer bg-transparent border-top-0">
                             <div class="d-grid gap-2">
-                                <form action="{{ url_for('send_friend_request', user_id=user.id) }}" method="POST">
-                                    <button type="submit" class="btn btn-outline-success btn-sm w-100 connect-btn">
-                                        <i class="bi bi-person-plus"></i> Connect
-                                    </button>
-                                </form>
-                                <a href="{{ url_for('friend_suggestions') }}" class="btn btn-outline-secondary btn-sm skip-btn">
-                                    <i class="bi bi-x-lg"></i> Skip
-                                </a>
+                                {% if current_user.is_friend_with(user) %}
+                                    <a href="{{ url_for('chat', user_id=user.id) }}" class="btn btn-primary btn-sm w-100">
+                                        <i class="bi bi-chat-dots"></i> Send Message
+                                    </a>
+                                {% else %}
+                                    <form action="{{ url_for('send_friend_request', user_id=user.id) }}" method="POST">
+                                        <button type="submit" class="btn btn-outline-success btn-sm w-100 connect-btn">
+                                            <i class="bi bi-person-plus"></i> Connect
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                <button type="button" class="btn btn-outline-info btn-sm locate-friend" data-user-id="{{ user.id }}">
+                                    <i class="bi bi-geo-alt"></i> View on Map
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -150,10 +159,10 @@
 
 {% block head %}
 <style>
-    .connect-btn, .skip-btn {
+    .connect-btn {
         transition: all 0.3s ease;
     }
-    .connect-btn:hover, .skip-btn:hover {
+    .connect-btn:hover {
         transform: scale(1.05);
     }
     .card {

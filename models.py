@@ -191,11 +191,12 @@ class User(UserMixin, db.Model):
         scored_matches.sort(key=lambda x: x[1], reverse=True)
         return scored_matches[:limit]
 
-    # Modified relationship definition to fix the circular backref
+    # Update the relationship to avoid circular backref
     chat_groups = db.relationship(
         'ChatGroup',
         secondary='group_membership',
-        backref=db.backref('members', lazy='dynamic'),
+        primaryjoin='User.id==group_membership.c.user_id',
+        secondaryjoin='ChatGroup.id==group_membership.c.group_id',
         lazy='dynamic'
     )
     notifications = db.relationship('Notification', backref='user', lazy='dynamic')
@@ -258,17 +259,37 @@ class Message(db.Model):
     def __repr__(self):
         return f'<Message {self.id}: {self.sender_id} -> {self.recipient_id}>'
 
+# Fix for the ChatGroup model - removing circular backref
 class ChatGroup(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=func.now())
-    creator = db.relationship('User', foreign_keys=[created_by], backref='created_groups')
+    creator = db.relationship('User', foreign_keys=[created_by])
 
     settings = db.Column(JSONB, default={
         'allow_media': True,
         'max_members': 50
     })
+
+    # Fix the relationship to avoid circular backref
+    members = db.relationship(
+        'User',
+        secondary='group_membership',
+        primaryjoin='ChatGroup.id==group_membership.c.group_id',
+        secondaryjoin='User.id==group_membership.c.user_id',
+        lazy='dynamic'
+    )
+
+    def __repr__(self):
+        return f'<ChatGroup {self.name}>'
+
+# Group membership association table
+group_membership = db.Table('group_membership',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('group_id', db.Integer, db.ForeignKey('chat_group.id'), primary_key=True),
+    db.Column('joined_at', db.DateTime, default=func.now())
+)
 
 class GroupMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -283,12 +304,6 @@ class GroupMessage(db.Model):
     group = db.relationship('ChatGroup', backref='messages')
     sender = db.relationship('User', backref='group_messages')
 
-# Group membership association table
-group_membership = db.Table('group_membership',
-    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
-    db.Column('group_id', db.Integer, db.ForeignKey('chat_group.id'), primary_key=True),
-    db.Column('joined_at', db.DateTime, default=func.now())
-)
 
 class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)

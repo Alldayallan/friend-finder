@@ -496,6 +496,62 @@ def upload_activity_image():
 
     return jsonify({'success': False, 'message': 'Invalid file type'})
 
+# Add new route for chat media uploads after the existing upload routes
+@app.route('/upload-chat-media', methods=['POST'])
+@login_required
+def upload_chat_media():
+    try:
+        if 'media' not in request.files:
+            return jsonify({'success': False, 'message': 'No file provided'})
+
+        file = request.files['media']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'No file selected'})
+
+        # Define allowed extensions for different media types
+        ALLOWED_EXTENSIONS = {
+            'image': {'png', 'jpg', 'jpeg', 'gif'},
+            'video': {'mp4', 'webm'},
+            'audio': {'mp3', 'wav', 'ogg'},
+            'document': {'pdf', 'doc', 'docx', 'txt'}
+        }
+
+        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        media_type = None
+        for type_name, extensions in ALLOWED_EXTENSIONS.items():
+            if file_ext in extensions:
+                media_type = type_name
+                break
+
+        if not media_type:
+            return jsonify({'success': False, 'message': 'File type not allowed'})
+
+        # Generate unique filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"chat_media_{current_user.id}_{timestamp}_{secure_filename(file.filename)}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        # Process different media types
+        if media_type == 'image':
+            image = Image.open(file)
+            # Resize image maintaining aspect ratio
+            image.thumbnail((800, 800), Image.Resampling.LANCZOS)
+            image.save(filepath, quality=85, optimize=True)
+        else:
+            # For other media types, save directly with size limit
+            file.save(filepath)
+
+        media_url = url_for('static', filename=f'uploads/{filename}')
+        return jsonify({
+            'success': True,
+            'media_url': media_url,
+            'media_type': media_type
+        })
+
+    except Exception as e:
+        app.logger.error(f"Media upload error: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error uploading media'})
+
 # SocketIO initialization
 socketio = SocketIO(app, cors_allowed_origins="*")
 
