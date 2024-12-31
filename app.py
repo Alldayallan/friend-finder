@@ -36,12 +36,14 @@ login_manager.login_view = 'login'
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
 
 # Initialize Flask-Mail
-mail = Mail(app)
+mail = Mail()
+mail.init_app(app)
 
 # Ensure upload directory exists
 upload_dir = os.path.join('static', 'uploads')
@@ -57,9 +59,9 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
 def send_otp_email(user_email, otp):
     try:
+        # Create message object with subject as first argument
         msg = Message(
-            'Your Login OTP',  # subject as first positional argument
-            sender=app.config['MAIL_DEFAULT_SENDER'],
+            'Your Login OTP',
             recipients=[user_email]
         )
         msg.body = f'''Your OTP for login is: {otp}
