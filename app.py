@@ -572,5 +572,60 @@ def test_message(recipient_id):
     return redirect(url_for('messages'))
 
 
+# Add these routes after the existing routes
+@app.route('/map')
+@login_required
+def friend_map():
+    return render_template('map.html')
+
+@app.route('/api/friend-locations')
+@login_required
+def friend_locations():
+    friends = current_user.friends.all()
+    friend_data = []
+
+    for friend in friends:
+        if friend.latitude and friend.longitude:
+            friend_data.append({
+                'id': friend.id,
+                'username': friend.username,
+                'latitude': friend.latitude,
+                'longitude': friend.longitude,
+                'profile_picture': friend.profile_picture,
+                'last_active': friend.last_active.isoformat() if friend.last_active else None
+            })
+
+    return jsonify(friend_data)
+
+@app.route('/api/update-location', methods=['POST'])
+@login_required
+def update_location():
+    data = request.get_json()
+
+    try:
+        current_user.latitude = float(data.get('latitude'))
+        current_user.longitude = float(data.get('longitude'))
+        current_user.last_active = datetime.now(timezone.utc)
+        db.session.commit()
+
+        # Notify friends about location update
+        friend_ids = [friend.id for friend in current_user.friends]
+        location_data = {
+            'id': current_user.id,
+            'username': current_user.username,
+            'latitude': current_user.latitude,
+            'longitude': current_user.longitude,
+            'profile_picture': current_user.profile_picture,
+            'last_active': current_user.last_active.isoformat()
+        }
+
+        for friend_id in friend_ids:
+            socketio.emit('friend_location_update', location_data, room=f'user_{friend_id}')
+
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"Location update error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 400
+
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)
