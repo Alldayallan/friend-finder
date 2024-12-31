@@ -555,6 +555,21 @@ def handle_message(data):
     emit('new_message', message_data, room=f'user_{recipient_id}')
     emit('new_message', message_data, room=f'user_{current_user.id}')
 
+@app.route('/test-message/<int:recipient_id>')
+@login_required
+def test_message(recipient_id):
+    # Create a test message
+    message = Message(
+        sender_id=current_user.id,
+        recipient_id=recipient_id,
+        content="Test message"
+    )
+    db.session.add(message)
+    db.session.commit()
+
+    flash('Test message sent successfully!', 'success')
+    return redirect(url_for('messages'))
+
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)
