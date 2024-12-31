@@ -26,42 +26,35 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-key-12345')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 
+# Mail configuration - moved here and simplified
+app.config.update(
+    MAIL_SERVER='smtp.gmail.com',
+    MAIL_PORT=587,
+    MAIL_USE_TLS=True,
+    MAIL_USE_SSL=False,
+    MAIL_USERNAME=os.environ.get('MAIL_USERNAME'),
+    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD'),
+    MAIL_DEFAULT_SENDER=os.environ.get('MAIL_DEFAULT_SENDER')
+)
+
 # Initialize extensions
 db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# Mail configuration
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USE_SSL'] = False
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
-
 # Initialize Flask-Mail
-mail = Mail()
-mail.init_app(app)
-
-# Ensure upload directory exists
-upload_dir = os.path.join('static', 'uploads')
-os.makedirs(upload_dir, exist_ok=True)
-
-# Add to the existing app configuration
-UPLOAD_FOLDER = os.path.join('static', 'uploads')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+mail = Mail(app)
 
 def send_otp_email(user_email, otp):
     try:
-        # Create message object with subject as first argument
+        logger.info(f"Attempting to send OTP email to {user_email}")
+        logger.debug(f"Mail config: SERVER={app.config['MAIL_SERVER']}, PORT={app.config['MAIL_PORT']}, "
+                    f"TLS={app.config['MAIL_USE_TLS']}, USERNAME={app.config['MAIL_USERNAME']}")
+
         msg = Message(
-            'Your Login OTP',
+            "Your Login OTP",  # subject as first positional argument
+            sender=app.config['MAIL_DEFAULT_SENDER'],
             recipients=[user_email]
         )
         msg.body = f'''Your OTP for login is: {otp}
@@ -74,7 +67,21 @@ If you did not request this code, please ignore this email.'''
         return True
     except Exception as e:
         logger.error(f"Failed to send OTP email: {str(e)}")
+        logger.error(f"Error type: {type(e)}")
+        logger.error(f"Error args: {e.args}")
         return False
+
+# Ensure upload directory exists
+upload_dir = os.path.join('static', 'uploads')
+os.makedirs(upload_dir, exist_ok=True)
+
+# Add to the existing app configuration
+UPLOAD_FOLDER = os.path.join('static', 'uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
 @login_manager.user_loader
 def load_user(user_id):
