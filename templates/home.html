@@ -3,16 +3,162 @@
 {% block title %}Home{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
+<div class="container-fluid py-3">
+    <div class="row">
+        <!-- Left Column: Connected Users -->
+        <div class="col-md-3">
             <div class="card">
-                <div class="card-body">
-                    <h2 class="card-title">Welcome, {{ current_user.username }}!</h2>
-                    <p class="card-text">You have successfully logged in to your account.</p>
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Your Connections</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for friend in current_user.friends %}
+                        <div class="list-group-item">
+                            <div class="d-flex align-items-center">
+                                {% if friend.profile_picture %}
+                                    <img src="{{ friend.profile_picture }}" class="rounded-circle me-2" width="40" height="40" alt="{{ friend.username }}">
+                                {% else %}
+                                    <div class="rounded-circle bg-secondary me-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                        <span class="text-white">{{ friend.username[0] | upper }}</span>
+                                    </div>
+                                {% endif %}
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-0">{{ friend.username }}</h6>
+                                    <small class="text-muted">
+                                        {% if friend.last_active %}
+                                            Last seen: {{ friend.last_active.strftime('%Y-%m-%d %H:%M') }}
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <div class="btn-group">
+                                    <a href="{{ url_for('chat', user_id=friend.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-comment"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-info locate-friend" data-user-id="{{ friend.id }}">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="list-group-item text-center py-3">
+                            <p class="mb-0">No connections yet</p>
+                            <a href="{{ url_for('friend_suggestions') }}" class="btn btn-sm btn-primary mt-2">Find Friends</a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Map -->
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-body p-0">
+                    <div id="map" style="height: 80vh;"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize the map
+    var map = L.map('map').setView([0, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    var markers = {};
+
+    // Function to update friend locations
+    function updateFriendLocations() {
+        fetch('/api/friend-locations')
+            .then(response => response.json())
+            .then(friends => {
+                friends.forEach(friend => {
+                    if (friend.latitude && friend.longitude) {
+                        let marker = markers[friend.id];
+                        let popupContent = `
+                            <div class="text-center">
+                                ${friend.profile_picture ? 
+                                    `<img src="${friend.profile_picture}" class="rounded-circle mb-2" width="40" height="40">` :
+                                    `<div class="rounded-circle bg-secondary mb-2 mx-auto d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                        <span class="text-white">${friend.username[0].toUpperCase()}</span>
+                                    </div>`
+                                }
+                                <h6>${friend.username}</h6>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="/chat/${friend.id}" class="btn btn-primary">Message</a>
+                                    <button onclick="centerOnUser(${friend.latitude}, ${friend.longitude})" class="btn btn-info">Center</button>
+                                </div>
+                            </div>`;
+
+                        if (!marker) {
+                            marker = L.marker([friend.latitude, friend.longitude])
+                                .addTo(map)
+                                .bindPopup(popupContent);
+                            markers[friend.id] = marker;
+                        } else {
+                            marker.setLatLng([friend.latitude, friend.longitude])
+                                .setPopupContent(popupContent);
+                        }
+                    }
+                });
+            });
+    }
+
+    // Function to center map on specific coordinates
+    function centerOnUser(lat, lng) {
+        map.setView([lat, lng], 13);
+    }
+
+    // Get user's location and update it
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            // Update user's location in the database
+            fetch('/api/update-location', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    latitude: lat,
+                    longitude: lng
+                })
+            });
+
+            // Center map on user's location
+            map.setView([lat, lng], 13);
+        });
+    }
+
+    // Update friend locations periodically
+    updateFriendLocations();
+    setInterval(updateFriendLocations, 30000); // Update every 30 seconds
+
+    // Handle locate friend button clicks
+    document.querySelectorAll('.locate-friend').forEach(button => {
+        button.addEventListener('click', function() {
+            const userId = this.getAttribute('data-user-id');
+            const marker = markers[userId];
+            if (marker) {
+                const position = marker.getLatLng();
+                centerOnUser(position.lat, position.lng);
+                marker.openPopup();
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

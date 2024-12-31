@@ -161,7 +161,7 @@ def verify_otp():
     user.otp_expiry = None
     db.session.commit()
 
-    return jsonify({"success": True, "redirect": url_for('profile')})
+    return jsonify({"success": True, "redirect": url_for('home')})
 
 @app.route('/logout')
 @login_required
@@ -242,6 +242,8 @@ def reset_password(token):
 @app.route('/')
 def index():
     logger.info("Accessing index route")
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
     return redirect(url_for('login'))
 
 @app.route('/profile', methods=['GET', 'POST'])
