@@ -496,7 +496,7 @@ def messages():
 
     # Get user objects for these IDs and all friends
     chat_partners = User.query.filter(User.id.in_(user_ids)).all()
-    friends = current_user.friends
+    friends = current_user.friends.all()  # Get all friends using the relationship
 
     return render_template('messages.html', chat_partners=chat_partners, friends=friends)
 

@@ -59,7 +59,7 @@ class User(UserMixin, db.Model):
     otp_code = db.Column(db.String(6))
     otp_expiry = db.Column(db.DateTime)
     last_active = db.Column(db.DateTime, default=func.now())
-    
+
     # Relationships for friend suggestions
     sent_matches = db.relationship(
         'UserMatch',
@@ -77,9 +77,9 @@ class User(UserMixin, db.Model):
     friends = db.relationship(
         'User', 
         secondary='friend_connection',
-        primaryjoin='User.id==friend_connection.c.user_id',
-        secondaryjoin='User.id==friend_connection.c.friend_id',
-        backref='befriended_by'
+        primaryjoin=('User.id==friend_connection.c.user_id'),
+        secondaryjoin=('User.id==friend_connection.c.friend_id'),
+        lazy='dynamic'
     )
 
 
@@ -157,6 +157,26 @@ class User(UserMixin, db.Model):
 
     def get_unread_messages_count(self):
         return Message.query.filter_by(recipient_id=self.id, is_read=False).count()
+
+    def is_friend_with(self, user):
+        """Check if the current user is friends with the given user"""
+        return self.friends.filter_by(id=user.id).first() is not None
+
+    def add_friend(self, user):
+        """Add a user as friend"""
+        if not self.is_friend_with(user):
+            self.friends.append(user)
+            user.friends.append(self)
+            return True
+        return False
+
+    def remove_friend(self, user):
+        """Remove a user from friends"""
+        if self.is_friend_with(user):
+            self.friends.remove(user)
+            user.friends.remove(self)
+            return True
+        return False
 
 class UserMatch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
