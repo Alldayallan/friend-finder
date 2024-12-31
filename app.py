@@ -309,14 +309,29 @@ def profile():
 def friend_suggestions():
     logger.info(f"Getting friend suggestions for user {current_user.id}")
 
-    # Get friend suggestions
-    suggestions = current_user.get_friend_suggestions(limit=10)
+    # Get filter parameters from request
+    filters = {
+        'search': request.args.get('search', ''),
+        'min_age': request.args.get('min_age', type=int),
+        'max_age': request.args.get('max_age', type=int),
+        'activity': request.args.get('activity', ''),
+        'interest': request.args.get('interest', ''),
+        'max_distance': request.args.get('max_distance', type=float)
+    }
+
+    # Remove empty filters
+    filters = {k: v for k, v in filters.items() if v}
+
+    # Get friend suggestions with filters
+    suggestions = current_user.get_friend_suggestions(limit=10, filters=filters)
 
     # Update last active timestamp
     current_user.last_active = datetime.now(timezone.utc)
     db.session.commit()
 
-    return render_template('friend_suggestions.html', suggestions=suggestions)
+    return render_template('friend_suggestions.html', 
+                         suggestions=suggestions,
+                         current_filters=filters)
 
 @app.route('/match-response/<int:match_id>/<string:response>')
 @login_required

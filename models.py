@@ -134,14 +134,54 @@ class User(UserMixin, db.Model):
         c = 2 * math.asin(math.sqrt(a))
         return R * c
 
-    def get_friend_suggestions(self, limit=10):
-        """Get friend suggestions sorted by match score"""
-        potential_friends = User.query.filter(
-            User.id != self.id,
-            User.looking_for == self.looking_for
-        ).all()
+    def get_friend_suggestions(self, limit=10, filters=None):
+        """Get friend suggestions sorted by match score with optional filters"""
+        query = User.query.filter(
+            User.id != self.id
+        )
 
-        # Calculate scores for all potential matches
+        if filters:
+            # Apply username/location search
+            if filters.get('search'):
+                search_term = f"%{filters['search']}%"
+                query = query.filter(
+                    db.or_(
+                        User.username.ilike(search_term),
+                        User.location.ilike(search_term)
+                    )
+                )
+
+            # Apply age filter
+            if filters.get('min_age'):
+                query = query.filter(User.age >= filters['min_age'])
+            if filters.get('max_age'):
+                query = query.filter(User.age <= filters['max_age'])
+
+            # Apply activity filter
+            if filters.get('activity'):
+                activity_term = f"%{filters['activity']}%"
+                query = query.filter(User.activities.ilike(activity_term))
+
+            # Apply interest filter
+            if filters.get('interest'):
+                interest_term = f"%{filters['interest']}%"
+                query = query.filter(User.interests.ilike(interest_term))
+
+            # Apply distance filter if coordinates are available
+            if filters.get('max_distance') and self.latitude and self.longitude:
+                # This is a simplified approach, for more accurate results 
+                # we should use PostGIS or a proper geospatial query
+                lat_range = filters['max_distance'] / 111  # roughly kilometers to degrees
+                lng_range = filters['max_distance'] / (111 * math.cos(math.radians(self.latitude)))
+
+                query = query.filter(
+                    User.latitude.between(self.latitude - lat_range, self.latitude + lat_range),
+                    User.longitude.between(self.longitude - lng_range, self.longitude + lng_range)
+                )
+
+        potential_friends = query.all()
+
+        # Calculate scores for filtered matches
         scored_matches = [
             (user, self.get_match_score(user))
             for user in potential_friends
@@ -150,7 +190,7 @@ class User(UserMixin, db.Model):
         # Sort by score and return top matches
         scored_matches.sort(key=lambda x: x[1], reverse=True)
         return scored_matches[:limit]
-    
+
     # Add new relationships for chat
     chat_groups = db.relationship('ChatGroup', secondary='group_membership')
     notifications = db.relationship('Notification', backref='user', lazy='dynamic')

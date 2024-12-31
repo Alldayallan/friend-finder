@@ -4,6 +4,60 @@
 
 {% block content %}
 <div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Search & Filters</h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" action="{{ url_for('friend_suggestions') }}" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="search" class="form-label">Search</label>
+                            <input type="text" class="form-control" id="search" name="search" 
+                                   placeholder="Username or Location" value="{{ current_filters.get('search', '') }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Age Range</label>
+                            <div class="d-flex gap-2">
+                                <input type="number" class="form-control" name="min_age" 
+                                       placeholder="Min" min="18" max="100" 
+                                       value="{{ current_filters.get('min_age', '') }}">
+                                <input type="number" class="form-control" name="max_age" 
+                                       placeholder="Max" min="18" max="100"
+                                       value="{{ current_filters.get('max_age', '') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="max_distance" class="form-label">Max Distance (km)</label>
+                            <input type="number" class="form-control" id="max_distance" name="max_distance" 
+                                   placeholder="Distance in km" min="1"
+                                   value="{{ current_filters.get('max_distance', '') }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="activity" class="form-label">Activity</label>
+                            <input type="text" class="form-control" id="activity" name="activity" 
+                                   placeholder="Search activities" value="{{ current_filters.get('activity', '') }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="interest" class="form-label">Interest</label>
+                            <input type="text" class="form-control" id="interest" name="interest" 
+                                   placeholder="Search interests" value="{{ current_filters.get('interest', '') }}">
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search"></i> Apply Filters
+                            </button>
+                            <a href="{{ url_for('friend_suggestions') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle"></i> Clear Filters
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <h2 class="mb-4">Friend Suggestions</h2>
 
     {% if not suggestions %}
@@ -15,7 +69,7 @@
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
             {% for user, score in suggestions %}
                 <div class="col">
-                    <div class="card h-100">
+                    <div class="card h-100 animate__animated animate__fadeIn">
                         <div class="position-absolute top-0 end-0 p-2">
                             <span class="badge bg-primary">{{ (score * 100)|round }}% Match</span>
                         </div>
@@ -54,14 +108,22 @@
                             {% if user.interests and user.privacy_settings.get('interests_visible', True) %}
                                 <div class="card-text mt-3">
                                     <h6><i class="bi bi-heart-fill"></i> Interests</h6>
-                                    {{ user.interests | safe }}
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for interest in user.interests.split(',') %}
+                                            <span class="badge bg-info">{{ interest.strip() }}</span>
+                                        {% endfor %}
+                                    </div>
                                 </div>
                             {% endif %}
 
                             {% if user.activities and user.privacy_settings.get('activities_visible', True) %}
                                 <div class="card-text mt-3">
                                     <h6><i class="bi bi-activity"></i> Activities</h6>
-                                    {{ user.activities | safe }}
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for activity in user.activities.split(',') %}
+                                            <span class="badge bg-success">{{ activity.strip() }}</span>
+                                        {% endfor %}
+                                    </div>
                                 </div>
                             {% endif %}
                         </div>
@@ -69,11 +131,11 @@
                         <div class="card-footer bg-transparent border-top-0">
                             <div class="d-grid gap-2">
                                 <form action="{{ url_for('send_friend_request', user_id=user.id) }}" method="POST">
-                                    <button type="submit" class="btn btn-outline-success btn-sm w-100">
+                                    <button type="submit" class="btn btn-outline-success btn-sm w-100 connect-btn">
                                         <i class="bi bi-person-plus"></i> Connect
                                     </button>
                                 </form>
-                                <a href="{{ url_for('friend_suggestions') }}" class="btn btn-outline-secondary btn-sm">
+                                <a href="{{ url_for('friend_suggestions') }}" class="btn btn-outline-secondary btn-sm skip-btn">
                                     <i class="bi bi-x-lg"></i> Skip
                                 </a>
                             </div>
@@ -84,4 +146,21 @@
         </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block head %}
+<style>
+    .connect-btn, .skip-btn {
+        transition: all 0.3s ease;
+    }
+    .connect-btn:hover, .skip-btn:hover {
+        transform: scale(1.05);
+    }
+    .card {
+        transition: transform 0.3s ease-in-out;
+    }
+    .card:hover {
+        transform: translateY(-5px);
+    }
+</style>
 {% endblock %}
