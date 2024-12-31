@@ -81,9 +81,9 @@ document.addEventListener('DOMContentLoaded', function() {
         attribution: '© Esri'
     });
 
-    // Terrain layer
-    const terrainLayer = L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg', {
-        attribution: '© Stamen Design'
+    // Updated Terrain layer with a more reliable source
+    const terrainLayer = L.tileLayer('https://tile.thunderforest.com/landscape/{z}/{x}/{y}.png?apikey=your-api-key', {
+        attribution: '© OpenStreetMap contributors, © Thunderforest'
     });
 
     // View toggle handlers
@@ -152,12 +152,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateNearbyFriendsList() {
         const friendsList = document.getElementById('nearbyFriendsList');
         friendsList.innerHTML = '';
-        
+
         Object.values(markers).forEach(marker => {
             const friend = marker.friend;
             const distance = map.distance(map.getCenter(), marker.getLatLng());
             const distanceKm = (distance / 1000).toFixed(1);
-            
+
             const friendElement = document.createElement('a');
             friendElement.href = '#';
             friendElement.className = 'list-group-item list-group-item-action d-flex align-items-center';
@@ -171,12 +171,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     <h6 class="mb-0">${friend.username}</h6>
                     <small class="text-muted">${distanceKm}km away</small>
                 </div>`;
-                
+
             friendElement.addEventListener('click', () => {
                 map.setView(marker.getLatLng(), 15);
                 marker.openPopup();
             });
-            
+
             friendsList.appendChild(friendElement);
         });
     }
