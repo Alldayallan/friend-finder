@@ -12,7 +12,7 @@ import random
 import string
 import io
 from database import db
-from models import User, UserMatch, FriendRequest, Message, ChatGroup, GroupMessage, Notification # Added FriendRequest and chat models
+from models import User, UserMatch, FriendRequest, Message as DbMessage, ChatGroup, GroupMessage, Notification
 from forms import LoginForm, RegistrationForm, RequestPasswordResetForm, ResetPasswordForm, ProfileForm
 import json
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -26,45 +26,55 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-key-12345')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 
-# Mail configuration - moved here and simplified
-app.config.update(
-    MAIL_SERVER='smtp.gmail.com',
-    MAIL_PORT=587,
-    MAIL_USE_TLS=True,
-    MAIL_USE_SSL=False,
-    MAIL_USERNAME=os.environ.get('MAIL_USERNAME'),
-    MAIL_PASSWORD=os.environ.get('MAIL_PASSWORD'),
-    MAIL_DEFAULT_SENDER=os.environ.get('MAIL_DEFAULT_SENDER')
-)
-
-# Initialize extensions
+# Initialize extensions first
 db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# Initialize Flask-Mail
-mail = Mail(app)
+# Mail configuration - simplified and explicit
+mail_username = os.environ.get('MAIL_USERNAME')
+mail_password = os.environ.get('MAIL_PASSWORD')
+mail_sender = os.environ.get('MAIL_DEFAULT_SENDER')
+
+logger.info(f"Mail Configuration - Username: {'Set' if mail_username else 'Not Set'}, "
+           f"Password: {'Set' if mail_password else 'Not Set'}, "
+           f"Sender: {'Set' if mail_sender else 'Not Set'}")
+
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+app.config['MAIL_USERNAME'] = mail_username
+app.config['MAIL_PASSWORD'] = mail_password
+app.config['MAIL_DEFAULT_SENDER'] = mail_sender
+
+# Initialize Flask-Mail with explicit app context
+mail = Mail()
+with app.app_context():
+    mail.init_app(app)
 
 def send_otp_email(user_email, otp):
     try:
         logger.info(f"Attempting to send OTP email to {user_email}")
-        logger.debug(f"Mail config: SERVER={app.config['MAIL_SERVER']}, PORT={app.config['MAIL_PORT']}, "
-                    f"TLS={app.config['MAIL_USE_TLS']}, USERNAME={app.config['MAIL_USERNAME']}")
+        logger.debug(f"Mail config: SERVER={app.config['MAIL_SERVER']}, "
+                    f"PORT={app.config['MAIL_PORT']}, "
+                    f"TLS={app.config['MAIL_USE_TLS']}, "
+                    f"USERNAME={'Set' if app.config['MAIL_USERNAME'] else 'Not Set'}")
 
-        msg = Message(
-            subject="Your Login OTP",
-            sender=app.config['MAIL_DEFAULT_SENDER'],
-            recipients=[user_email],
-            body=f'''Your OTP for login is: {otp}
+        with app.app_context():
+            msg = Message()
+            msg.subject = "Your Login OTP"
+            msg.sender = app.config['MAIL_DEFAULT_SENDER']
+            msg.recipients = [user_email]
+            msg.body = f'''Your OTP for login is: {otp}
 
 This code will expire in 10 minutes.
 If you did not request this code, please ignore this email.'''
-        )
 
-        mail.send(msg)
-        logger.info(f"OTP email sent successfully to {user_email}")
-        return True
+            mail.send(msg)
+            logger.info(f"OTP email sent successfully to {user_email}")
+            return True
     except Exception as e:
         logger.error(f"Failed to send OTP email: {str(e)}")
         logger.error(f"Error type: {type(e)}")
@@ -493,13 +503,13 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 @login_required
 def chat(user_id):
     other_user = User.query.get_or_404(user_id)
-    messages = Message.query.filter(
-        ((Message.sender_id == current_user.id) & (Message.recipient_id == user_id)) |
-        ((Message.sender_id == user_id) & (Message.recipient_id == current_user.id))
-    ).order_by(Message.created_at.asc()).all()
+    messages = DbMessage.query.filter(
+        ((DbMessage.sender_id == current_user.id) & (DbMessage.recipient_id == user_id)) |
+        ((DbMessage.sender_id == user_id) & (DbMessage.recipient_id == current_user.id))
+    ).order_by(DbMessage.created_at.asc()).all()
 
     # Mark messages as read
-    unread_messages = Message.query.filter_by(
+    unread_messages = DbMessage.query.filter_by(
         recipient_id=current_user.id,
         sender_id=user_id,
         is_read=False
@@ -515,8 +525,8 @@ def chat(user_id):
 @login_required
 def messages():
     # Get list of users current user has chatted with using subqueries
-    sent_messages = Message.query.filter_by(sender_id=current_user.id).with_entities(Message.recipient_id).distinct()
-    received_messages = Message.query.filter_by(recipient_id=current_user.id).with_entities(Message.sender_id).distinct()
+    sent_messages = DbMessage.query.filter_by(sender_id=current_user.id).with_entities(DbMessage.recipient_id).distinct()
+    received_messages = DbMessage.query.filter_by(recipient_id=current_user.id).with_entities(DbMessage.sender_id).distinct()
 
     # Combine both subqueries to get all unique user IDs
     user_ids = [id[0] for id in sent_messages.union(received_messages).all()]
@@ -550,7 +560,7 @@ def handle_message(data):
     media_url = data.get('media_url')
     media_type = data.get('media_type')
 
-    message = Message(
+    message = DbMessage(
         sender_id=current_user.id,
         recipient_id=recipient_id,
         content=content,
@@ -587,7 +597,7 @@ def handle_message(data):
 @login_required
 def test_message(recipient_id):
     # Create a test message
-    message = Message(
+    message = DbMessage(
         sender_id=current_user.id,
         recipient_id=recipient_id,
         content="Test message"
