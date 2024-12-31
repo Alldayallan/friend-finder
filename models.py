@@ -12,6 +12,7 @@ from database import db
 import math
 from sqlalchemy.sql import func
 from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.dialects.postgresql import JSONB
 
 class FriendRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -149,6 +150,13 @@ class User(UserMixin, db.Model):
         # Sort by score and return top matches
         scored_matches.sort(key=lambda x: x[1], reverse=True)
         return scored_matches[:limit]
+    
+    # Add new relationships for chat
+    chat_groups = db.relationship('ChatGroup', secondary='group_membership')
+    notifications = db.relationship('Notification', backref='user', lazy='dynamic')
+
+    def get_unread_messages_count(self):
+        return Message.query.filter_by(recipient_id=self.id, is_read=False).count()
 
 class UserMatch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -167,3 +175,61 @@ friend_connection = db.Table('friend_connection',
     db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
     db.Column('friend_id', db.Integer, db.ForeignKey('user.id'), primary_key=True)
 )
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    media_url = db.Column(db.String(500))  # For storing media file URLs
+    media_type = db.Column(db.String(50))  # 'image', 'video', or 'voice'
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=func.now())
+
+    # Relationships
+    sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
+    recipient = db.relationship('User', foreign_keys=[recipient_id], backref='received_messages')
+
+    def __repr__(self):
+        return f'<Message {self.id}: {self.sender_id} -> {self.recipient_id}>'
+
+class ChatGroup(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=func.now())
+
+    # Store group settings as JSON
+    settings = db.Column(JSONB, default={
+        'allow_media': True,
+        'max_members': 50
+    })
+
+class GroupMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('chat_group.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    media_url = db.Column(db.String(500))
+    media_type = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=func.now())
+
+    # Relationships
+    group = db.relationship('ChatGroup', backref='messages')
+    sender = db.relationship('User', backref='group_messages')
+
+# Group membership association table
+group_membership = db.Table('group_membership',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('group_id', db.Integer, db.ForeignKey('chat_group.id'), primary_key=True),
+    db.Column('joined_at', db.DateTime, default=func.now())
+)
+
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    type = db.Column(db.String(50), nullable=False)  # 'message', 'friend_request', 'nearby_friend'
+    content = db.Column(db.Text, nullable=False)
+    related_id = db.Column(db.Integer)  # ID of related entity (message_id, friend_request_id, etc.)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=func.now())

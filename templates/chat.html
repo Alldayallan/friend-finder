@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Chat with {{ other_user.username }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        {% if other_user.profile_picture %}
+                            <img src="{{ other_user.profile_picture }}" 
+                                 class="rounded-circle me-2" 
+                                 alt="Profile picture" 
+                                 style="width: 40px; height: 40px; object-fit: cover;">
+                        {% else %}
+                            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-2"
+                                 style="width: 40px; height: 40px;">
+                                <i class="bi bi-person-fill text-white"></i>
+                            </div>
+                        {% endif %}
+                        <h5 class="mb-0">{{ other_user.username }}</h5>
+                    </div>
+                    <small class="text-white-50">
+                        {% if other_user.last_active %}
+                            Last seen: {{ other_user.last_active.strftime('%H:%M') }}
+                        {% endif %}
+                    </small>
+                </div>
+                
+                <div class="card-body bg-dark" style="height: 400px; overflow-y: auto;" id="messageContainer">
+                    {% for message in messages %}
+                        <div class="mb-3 d-flex {% if message.sender_id == current_user.id %}justify-content-end{% endif %}">
+                            <div class="{% if message.sender_id == current_user.id %}bg-primary{% else %}bg-secondary{% endif %} text-white rounded p-2 max-w-75">
+                                {% if message.media_url %}
+                                    {% if message.media_type == 'image' %}
+                                        <img src="{{ message.media_url }}" class="img-fluid rounded mb-2" alt="Shared image">
+                                    {% elif message.media_type == 'video' %}
+                                        <video controls class="img-fluid rounded mb-2">
+                                            <source src="{{ message.media_url }}" type="video/mp4">
+                                            Your browser does not support the video tag.
+                                        </video>
+                                    {% elif message.media_type == 'voice' %}
+                                        <audio controls class="mb-2">
+                                            <source src="{{ message.media_url }}" type="audio/mpeg">
+                                            Your browser does not support the audio tag.
+                                        </audio>
+                                    {% endif %}
+                                {% endif %}
+                                {{ message.content }}
+                                <div class="text-white-50 small text-end">
+                                    {{ message.created_at.strftime('%H:%M') }}
+                                    {% if message.sender_id == current_user.id %}
+                                        {% if message.is_read %}
+                                            <i class="bi bi-check2-all"></i>
+                                        {% else %}
+                                            <i class="bi bi-check2"></i>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="card-footer">
+                    <form id="messageForm" class="d-flex gap-2">
+                        <input type="hidden" id="recipient_id" value="{{ other_user.id }}">
+                        <div class="input-group">
+                            <button type="button" class="btn btn-outline-secondary" id="mediaButton">
+                                <i class="bi bi-paperclip"></i>
+                            </button>
+                            <input type="text" class="form-control" id="messageInput" placeholder="Type a message...">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </div>
+                    </form>
+                    <input type="file" id="mediaInput" accept="image/*,video/*,audio/*" style="display: none;">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const socket = io();
+        const messageContainer = document.getElementById('messageContainer');
+        const messageForm = document.getElementById('messageForm');
+        const messageInput = document.getElementById('messageInput');
+        const mediaButton = document.getElementById('mediaButton');
+        const mediaInput = document.getElementById('mediaInput');
+        const recipientId = document.getElementById('recipient_id').value;
+        
+        // Scroll to bottom of messages
+        messageContainer.scrollTop = messageContainer.scrollHeight;
+        
+        socket.on('connect', () => {
+            console.log('Connected to WebSocket');
+        });
+        
+        socket.on('new_message', (data) => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `mb-3 d-flex ${data.sender_id == {{ current_user.id }} ? 'justify-content-end' : ''}`;
+            
+            let mediaContent = '';
+            if (data.media_url) {
+                if (data.media_type === 'image') {
+                    mediaContent = `<img src="${data.media_url}" class="img-fluid rounded mb-2" alt="Shared image">`;
+                } else if (data.media_type === 'video') {
+                    mediaContent = `
+                        <video controls class="img-fluid rounded mb-2">
+                            <source src="${data.media_url}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>`;
+                } else if (data.media_type === 'voice') {
+                    mediaContent = `
+                        <audio controls class="mb-2">
+                            <source src="${data.media_url}" type="audio/mpeg">
+                            Your browser does not support the audio tag.
+                        </audio>`;
+                }
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="${data.sender_id == {{ current_user.id }} ? 'bg-primary' : 'bg-secondary'} text-white rounded p-2 max-w-75">
+                    ${mediaContent}
+                    ${data.content}
+                    <div class="text-white-50 small text-end">
+                        ${new Date(data.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        ${data.sender_id == {{ current_user.id }} ? '<i class="bi bi-check2"></i>' : ''}
+                    </div>
+                </div>
+            `;
+            
+            messageContainer.appendChild(messageDiv);
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        });
+        
+        messageForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const content = messageInput.value.trim();
+            if (content) {
+                socket.emit('send_message', {
+                    recipient_id: recipientId,
+                    content: content
+                });
+                messageInput.value = '';
+            }
+        });
+        
+        mediaButton.addEventListener('click', function() {
+            mediaInput.click();
+        });
+        
+        mediaInput.addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('media', file);
+            
+            try {
+                const response = await fetch('/upload-chat-media', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    socket.emit('send_message', {
+                        recipient_id: recipientId,
+                        content: '',
+                        media_url: data.media_url,
+                        media_type: file.type.startsWith('image/') ? 'image' :
+                                  file.type.startsWith('video/') ? 'video' : 'voice'
+                    });
+                }
+            } catch (error) {
+                console.error('Error uploading media:', error);
+                alert('Failed to upload media. Please try again.');
+            }
+        });
+    });
+</script>
+{% endblock %}

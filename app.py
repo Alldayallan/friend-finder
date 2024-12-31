@@ -12,9 +12,10 @@ import random
 import string
 import io
 from database import db
-from models import User, UserMatch, FriendRequest # Added FriendRequest model
+from models import User, UserMatch, FriendRequest, Message, ChatGroup, GroupMessage, Notification # Added FriendRequest and chat models
 from forms import LoginForm, RegistrationForm, RequestPasswordResetForm, ResetPasswordForm, ProfileForm
 import json
+from flask_socketio import SocketIO, emit, join_room, leave_room
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -456,5 +457,100 @@ def upload_activity_image():
 
     return jsonify({'success': False, 'message': 'Invalid file type'})
 
-if __name__ == "__main__":
-    app.run(debug=True)
+# SocketIO initialization
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+#New Routes for Chat
+
+@app.route('/chat/<int:user_id>')
+@login_required
+def chat(user_id):
+    other_user = User.query.get_or_404(user_id)
+    messages = Message.query.filter(
+        ((Message.sender_id == current_user.id) & (Message.recipient_id == user_id)) |
+        ((Message.sender_id == user_id) & (Message.recipient_id == current_user.id))
+    ).order_by(Message.created_at.asc()).all()
+
+    # Mark messages as read
+    unread_messages = Message.query.filter_by(
+        recipient_id=current_user.id,
+        sender_id=user_id,
+        is_read=False
+    ).all()
+
+    for message in unread_messages:
+        message.is_read = True
+    db.session.commit()
+
+    return render_template('chat.html', other_user=other_user, messages=messages)
+
+@app.route('/messages')
+@login_required
+def messages():
+    # Get list of users current user has chatted with
+    chat_partners = db.session.query(User).join(Message, 
+        ((Message.sender_id == User.id) & (Message.recipient_id == current_user.id)) |
+        ((Message.recipient_id == User.id) & (Message.sender_id == current_user.id))
+    ).distinct().all()
+
+    return render_template('messages.html', chat_partners=chat_partners)
+
+
+@socketio.on('connect')
+def handle_connect():
+    if current_user.is_authenticated:
+        join_room(f'user_{current_user.id}')
+        current_user.last_active = datetime.now(timezone.utc)
+        db.session.commit()
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    if current_user.is_authenticated:
+        leave_room(f'user_{current_user.id}')
+
+@socketio.on('send_message')
+def handle_message(data):
+    if not current_user.is_authenticated:
+        return
+
+    recipient_id = data.get('recipient_id')
+    content = data.get('content')
+    media_url = data.get('media_url')
+    media_type = data.get('media_type')
+
+    message = Message(
+        sender_id=current_user.id,
+        recipient_id=recipient_id,
+        content=content,
+        media_url=media_url,
+        media_type=media_type
+    )
+    db.session.add(message)
+
+    # Create notification for recipient
+    notification = Notification(
+        user_id=recipient_id,
+        type='message',
+        content=f'New message from {current_user.username}',
+        related_id=message.id
+    )
+    db.session.add(notification)
+    db.session.commit()
+
+    # Emit the message to both sender and recipient
+    message_data = {
+        'id': message.id,
+        'sender_id': message.sender_id,
+        'content': message.content,
+        'media_url': message.media_url,
+        'media_type': message.media_type,
+        'created_at': message.created_at.isoformat(),
+        'sender_username': current_user.username
+    }
+
+    emit('new_message', message_data, room=f'user_{recipient_id}')
+    emit('new_message', message_data, room=f'user_{current_user.id}')
+
+
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
