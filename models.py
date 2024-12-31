@@ -192,7 +192,9 @@ class User(UserMixin, db.Model):
         return scored_matches[:limit]
 
     # Add new relationships for chat
-    chat_groups = db.relationship('ChatGroup', secondary='group_membership', backref=db.backref('members', lazy='dynamic'))
+    chat_groups = db.relationship('ChatGroup', 
+                                secondary='group_membership',
+                                lazy='dynamic')
     notifications = db.relationship('Notification', backref='user', lazy='dynamic')
 
     def get_unread_messages_count(self):
