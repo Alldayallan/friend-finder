@@ -487,11 +487,15 @@ def chat(user_id):
 @app.route('/messages')
 @login_required
 def messages():
-    # Get list of users current user has chatted with
-    chat_partners = db.session.query(User).join(Message, 
-        ((Message.sender_id == User.id) & (Message.recipient_id == current_user.id)) |
-        ((Message.recipient_id == User.id) & (Message.sender_id == current_user.id))
-    ).distinct().all()
+    # Get list of users current user has chatted with using subqueries
+    sent_messages = Message.query.filter_by(sender_id=current_user.id).with_entities(Message.recipient_id).distinct()
+    received_messages = Message.query.filter_by(recipient_id=current_user.id).with_entities(Message.sender_id).distinct()
+
+    # Combine both subqueries to get all unique user IDs
+    user_ids = [id[0] for id in sent_messages.union(received_messages).all()]
+
+    # Get user objects for these IDs
+    chat_partners = User.query.filter(User.id.in_(user_ids)).all()
 
     return render_template('messages.html', chat_partners=chat_partners)
 
