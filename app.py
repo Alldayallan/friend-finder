@@ -57,18 +57,16 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
 def send_otp_email(user_email, otp):
     try:
-        subject = 'Your Login OTP'
-        body = f'''Your OTP for login is: {otp}
+        msg = Message(
+            'Your Login OTP',  # subject as first positional argument
+            sender=app.config['MAIL_DEFAULT_SENDER'],
+            recipients=[user_email]
+        )
+        msg.body = f'''Your OTP for login is: {otp}
 
 This code will expire in 10 minutes.
 If you did not request this code, please ignore this email.'''
 
-        msg = Message(
-            subject=subject,
-            recipients=[user_email],
-            body=body,
-            sender=app.config['MAIL_DEFAULT_SENDER']
-        )
         mail.send(msg)
         logger.info(f"OTP email sent successfully to {user_email}")
         return True
