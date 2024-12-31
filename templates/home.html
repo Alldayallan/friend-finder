@@ -4,60 +4,57 @@
 
 {% block content %}
 <div class="container-fluid py-3">
-    <div class="row">
-        <!-- Left Column: Connected Users -->
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Your Connections</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush">
-                        {% for friend in current_user.friends %}
-                        <div class="list-group-item">
-                            <div class="d-flex align-items-center">
-                                {% if friend.profile_picture %}
-                                    <img src="{{ friend.profile_picture }}" class="rounded-circle me-2" width="40" height="40" alt="{{ friend.username }}">
-                                {% else %}
-                                    <div class="rounded-circle bg-secondary me-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                                        <span class="text-white">{{ friend.username[0] | upper }}</span>
-                                    </div>
+    <!-- Map Section -->
+    <div class="card mb-3">
+        <div class="card-body p-0">
+            <div id="map" style="height: 60vh;"></div>
+        </div>
+    </div>
+
+    <!-- Connections Section -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Your Connections</h5>
+            <a href="{{ url_for('friend_suggestions') }}" class="btn btn-sm btn-primary">Find Friends</a>
+        </div>
+        <div class="card-body p-0">
+            <div class="row g-0">
+                {% for friend in current_user.friends %}
+                <div class="col-md-3 border-end">
+                    <div class="p-3">
+                        <div class="text-center mb-2">
+                            {% if friend.profile_picture %}
+                                <img src="{{ friend.profile_picture }}" class="rounded-circle" width="64" height="64" alt="{{ friend.username }}">
+                            {% else %}
+                                <div class="rounded-circle bg-secondary mx-auto d-flex align-items-center justify-content-center" style="width: 64px; height: 64px;">
+                                    <span class="text-white fs-4">{{ friend.username[0] | upper }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="text-center">
+                            <h6 class="mb-1">{{ friend.username }}</h6>
+                            <small class="text-muted d-block mb-2">
+                                {% if friend.last_active %}
+                                    Last seen: {{ friend.last_active.strftime('%Y-%m-%d %H:%M') }}
                                 {% endif %}
-                                <div class="flex-grow-1">
-                                    <h6 class="mb-0">{{ friend.username }}</h6>
-                                    <small class="text-muted">
-                                        {% if friend.last_active %}
-                                            Last seen: {{ friend.last_active.strftime('%Y-%m-%d %H:%M') }}
-                                        {% endif %}
-                                    </small>
-                                </div>
-                                <div class="btn-group">
-                                    <a href="{{ url_for('chat', user_id=friend.id) }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-comment"></i>
-                                    </a>
-                                    <button type="button" class="btn btn-sm btn-outline-info locate-friend" data-user-id="{{ friend.id }}">
-                                        <i class="fas fa-map-marker-alt"></i>
-                                    </button>
-                                </div>
+                            </small>
+                            <div class="btn-group w-100">
+                                <a href="{{ url_for('chat', user_id=friend.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-comment me-1"></i> Send Message
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-info locate-friend" data-user-id="{{ friend.id }}">
+                                    <i class="fas fa-map-marker-alt me-1"></i> Locate
+                                </button>
                             </div>
                         </div>
-                        {% else %}
-                        <div class="list-group-item text-center py-3">
-                            <p class="mb-0">No connections yet</p>
-                            <a href="{{ url_for('friend_suggestions') }}" class="btn btn-sm btn-primary mt-2">Find Friends</a>
-                        </div>
-                        {% endfor %}
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Right Column: Map -->
-        <div class="col-md-9">
-            <div class="card">
-                <div class="card-body p-0">
-                    <div id="map" style="height: 80vh;"></div>
+                {% else %}
+                <div class="col-12 text-center py-4">
+                    <p class="mb-0">No connections yet</p>
+                    <a href="{{ url_for('friend_suggestions') }}" class="btn btn-primary mt-2">Find Friends</a>
                 </div>
+                {% endfor %}
             </div>
         </div>
     </div>
@@ -96,8 +93,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 }
                                 <h6>${friend.username}</h6>
                                 <div class="btn-group btn-group-sm">
-                                    <a href="/chat/${friend.id}" class="btn btn-primary">Message</a>
-                                    <button onclick="centerOnUser(${friend.latitude}, ${friend.longitude})" class="btn btn-info">Center</button>
+                                    <a href="/chat/${friend.id}" class="btn btn-primary">
+                                        <i class="fas fa-comment me-1"></i> Message
+                                    </a>
+                                    <button onclick="centerOnUser(${friend.latitude}, ${friend.longitude})" class="btn btn-info">
+                                        <i class="fas fa-map-marker-alt me-1"></i> Center
+                                    </button>
                                 </div>
                             </div>`;
 
