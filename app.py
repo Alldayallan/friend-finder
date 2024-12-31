@@ -586,8 +586,116 @@ def test_message(recipient_id):
     flash('Test message sent successfully!', 'success')
     return redirect(url_for('messages'))
 
+# Add these new routes after the existing chat routes
 
-# Add these routes after the existing routes
+@app.route('/groups')
+@login_required
+def groups():
+    return render_template('group_chat.html', active_group=None)
+
+@app.route('/group/<int:group_id>')
+@login_required
+def group_chat(group_id):
+    group = ChatGroup.query.get_or_404(group_id)
+    messages = GroupMessage.query.filter_by(group_id=group_id).order_by(GroupMessage.created_at.asc()).all()
+    return render_template('group_chat.html', active_group=group, messages=messages)
+
+@app.route('/create-group', methods=['POST'])
+@login_required
+def create_group():
+    name = request.form.get('name')
+    member_ids = request.form.getlist('members[]')
+
+    if not name:
+        flash('Group name is required', 'error')
+        return redirect(url_for('groups'))
+
+    try:
+        # Create new group
+        group = ChatGroup(name=name, created_by=current_user.id)
+        db.session.add(group)
+
+        # Add creator as member
+        group.members.append(current_user)
+
+        # Add selected members
+        for member_id in member_ids:
+            member = User.query.get(int(member_id))
+            if member and member != current_user:
+                group.members.append(member)
+
+        db.session.commit()
+        flash('Group created successfully!', 'success')
+        return redirect(url_for('group_chat', group_id=group.id))
+    except Exception as e:
+        app.logger.error(f"Group creation error: {str(e)}")
+        flash('Error creating group', 'error')
+        db.session.rollback()
+        return redirect(url_for('groups'))
+
+# Add these new socket event handlers after the existing ones
+
+@socketio.on('join_group')
+def handle_join_group(data):
+    if not current_user.is_authenticated:
+        return
+
+    group_id = data.get('group_id')
+    if group_id:
+        join_room(f'group_{group_id}')
+        current_user.last_active = datetime.now(timezone.utc)
+        db.session.commit()
+
+@socketio.on('group_message')
+def handle_group_message(data):
+    if not current_user.is_authenticated:
+        return
+
+    group_id = data.get('group_id')
+    content = data.get('content')
+    media_url = data.get('media_url')
+    media_type = data.get('media_type')
+
+    group = ChatGroup.query.get(group_id)
+    if not group or current_user not in group.members:
+        return
+
+    message = GroupMessage(
+        group_id=group_id,
+        sender_id=current_user.id,
+        content=content,
+        media_url=media_url,
+        media_type=media_type
+    )
+    db.session.add(message)
+
+    # Create notifications for group members
+    for member in group.members:
+        if member.id != current_user.id:
+            notification = Notification(
+                user_id=member.id,
+                type='group_message',
+                content=f'New message in {group.name} from {current_user.username}',
+                related_id=message.id
+            )
+            db.session.add(notification)
+
+    db.session.commit()
+
+    # Emit the message to all group members
+    message_data = {
+        'id': message.id,
+        'sender_id': message.sender_id,
+        'sender_username': current_user.username,
+        'content': message.content,
+        'media_url': message.media_url,
+        'media_type': message.media_type,
+        'created_at': message.created_at.isoformat()
+    }
+
+    emit('group_message', message_data, room=f'group_{group_id}')
+
+
 @app.route('/map')
 @login_required
 def friend_map():
