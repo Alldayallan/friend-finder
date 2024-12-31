@@ -494,10 +494,11 @@ def messages():
     # Combine both subqueries to get all unique user IDs
     user_ids = [id[0] for id in sent_messages.union(received_messages).all()]
 
-    # Get user objects for these IDs
+    # Get user objects for these IDs and all friends
     chat_partners = User.query.filter(User.id.in_(user_ids)).all()
+    friends = current_user.friends
 
-    return render_template('messages.html', chat_partners=chat_partners)
+    return render_template('messages.html', chat_partners=chat_partners, friends=friends)
 
 
 @socketio.on('connect')
